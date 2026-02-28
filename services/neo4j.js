@@ -7,9 +7,6 @@
  * Response shape:  { data: { fields: [...], values: [[...], ...] }, bookmarks: [...] }
  */
 
-const { default: fetch } = require('node-fetch');
-const { HttpsProxyAgent } = require('https-proxy-agent');
-
 // ---- Config ----------------------------------------------------------------
 
 function getBase() {
@@ -29,23 +26,15 @@ function getAuth() {
   return 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
 }
 
-function getAgent() {
-  const proxy = process.env.https_proxy || process.env.HTTPS_PROXY
-             || process.env.http_proxy  || process.env.HTTP_PROXY;
-  return proxy ? new HttpsProxyAgent(proxy) : undefined;
-}
-
 const DB = process.env.NEO4J_DATABASE || 'neo4j';
 
 // ---- Core HTTP request -----------------------------------------------------
 
 async function queryApi(statement, parameters = {}) {
-  const url   = `${getBase()}/db/${DB}/query/v2`;
-  const agent = getAgent();
+  const url = `${getBase()}/db/${DB}/query/v2`;
 
   const res = await fetch(url, {
     method: 'POST',
-    agent,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': getAuth(),
