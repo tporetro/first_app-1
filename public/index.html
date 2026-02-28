@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Owner Network – Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <h2>&#9651; Owner Network</h2>
+      <p>Commercial RE Intelligence</p>
+    </div>
+    <div class="sidebar-nav">
+      <a href="/"         class="nav-item" id="nav-home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Dashboard
+      </a>
+      <a href="/graph"    class="nav-item" id="nav-graph">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Graph View
+      </a>
+      <a href="/upload"   class="nav-item" id="nav-upload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+        Upload CSV
+      </a>
+      <a href="/analysis" class="nav-item" id="nav-analysis">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Analysis
+      </a>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title">Dashboard</span>
+      <div class="topbar-actions">
+        <button class="btn btn-secondary btn-sm" onclick="loadStats()">&#8635; Refresh</button>
+        <button class="btn btn-danger btn-sm" onclick="clearData()">Clear All Data</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Connection status -->
+      <div id="conn-status"></div>
+
+      <!-- Stat tiles -->
+      <div class="stat-grid" id="stat-grid">
+        <div class="stat-tile total">  <div class="value" id="s-nodes">—</div><div class="label">Total Nodes</div></div>
+        <div class="stat-tile rels">   <div class="value" id="s-rels">—</div> <div class="label">Relationships</div></div>
+        <div class="stat-tile persons"><div class="value" id="s-persons">—</div><div class="label">People</div></div>
+        <div class="stat-tile buildings"><div class="value" id="s-buildings">—</div><div class="label">Buildings</div></div>
+        <div class="stat-tile companies"><div class="value" id="s-companies">—</div><div class="label">Companies</div></div>
+      </div>
+
+      <!-- Quick actions -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+        <div class="card">
+          <div class="card-title">Quick Actions</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <a href="/upload"   class="btn btn-primary w-full" style="justify-content:center">&#8679; Upload CSV File</a>
+            <a href="/graph"    class="btn btn-secondary w-full" style="justify-content:center">&#9651; View Full Graph</a>
+            <a href="/analysis" class="btn btn-secondary w-full" style="justify-content:center">&#9741; Run Analysis</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Top Influencers</div>
+          <div id="top-influence">
+            <div style="color:var(--text-muted);font-size:13px;">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="card">
+        <div class="card-title">Node &amp; Relationship Legend</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+          <div>
+            <div class="panel-title mb-2">Node Types</div>
+            <div class="legend">
+              <div class="legend-item"><span class="legend-dot" style="background:#1d4ed8;border:2px solid #3b82f6"></span> Person / Owner</div>
+              <div class="legend-item"><span class="legend-sq" style="background:#c2410c;border:2px solid #f97316"></span> Building</div>
+              <div class="legend-item"><span class="legend-di" style="background:#15803d;border:2px solid #22c55e"></span> Company</div>
+            </div>
+          </div>
+          <div>
+            <div class="panel-title mb-2">Relationship Types</div>
+            <div class="legend">
+              <div class="legend-item"><span style="display:inline-block;width:24px;height:3px;background:#f97316;border-radius:2px"></span> OWNS</div>
+              <div class="legend-item"><span style="display:inline-block;width:24px;height:3px;background:#22c55e;border-radius:2px"></span> WORKS_AT</div>
+              <div class="legend-item"><span style="display:inline-block;width:24px;height:3px;background:#38bdf8;border-radius:2px"></span> KNOWS</div>
+              <div class="legend-item"><span style="display:inline-block;width:24px;height:3px;background:#ec4899;border-radius:2px"></span> FAMILY_OF</div>
+              <div class="legend-item"><span style="display:inline-block;width:24px;height:3px;background:#a78bfa;border-radius:2px;border-top:3px dashed #a78bfa;height:0"></span> FOLLOWS</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app-shell -->
+
+<script src="/js/main.js"></script>
+<script>
+  setActive('/');
+
+  async function loadStats() {
+    try {
+      const s = await apiFetch('/stats');
+      document.getElementById('s-nodes').textContent     = formatNum(s.totalNodes);
+      document.getElementById('s-rels').textContent      = formatNum(s.totalRelationships);
+      document.getElementById('s-persons').textContent   = formatNum(s.persons);
+      document.getElementById('s-buildings').textContent = formatNum(s.buildings);
+      document.getElementById('s-companies').textContent = formatNum(s.companies);
+    } catch (err) {
+      showAlert(document.getElementById('conn-status'),
+        'Cannot reach Neo4j: ' + err.message + '. Make sure Neo4j is running and configured in .env', 'error');
+    }
+  }
+
+  async function loadTopInfluence() {
+    try {
+      const scores = await apiFetch('/analysis/influence?limit=5');
+      const el = document.getElementById('top-influence');
+      if (!scores.length) { el.innerHTML = '<p class="text-muted text-sm">No data yet. Upload a CSV to get started.</p>'; return; }
+      const max = scores[0].degree || 1;
+      el.innerHTML = scores.map((s, i) => `
+        <div style="margin-bottom:10px;">
+          <div class="flex justify-between mb-2">
+            <span style="font-size:13px;font-weight:600">${i+1}. ${escHtml(s.name)}</span>
+            <span class="text-muted text-sm">${s.degree} links</span>
+          </div>
+          <div class="influence-bar-bg">
+            <div class="influence-bar-fill" style="width:${Math.round(s.degree/max*100)}%"></div>
+          </div>
+        </div>
+      `).join('');
+    } catch (_) {}
+  }
+
+  async function clearData() {
+    if (!confirm('Delete ALL nodes and relationships from Neo4j? This cannot be undone.')) return;
+    try {
+      await apiFetch('/data', { method: 'DELETE' });
+      await loadStats();
+      await loadTopInfluence();
+      showAlert(document.getElementById('conn-status'), 'All data cleared.', 'success');
+    } catch (err) {
+      showAlert(document.getElementById('conn-status'), err.message, 'error');
+    }
+  }
+
+  loadStats();
+  loadTopInfluence();
+</script>
+</body>
+</html>

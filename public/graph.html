@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Owner Network – Graph View</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <!-- vis-network -->
+  <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+  <style>
+    body { overflow: hidden; }
+    .graph-shell { height: calc(100vh - 56px); }
+    #graph-canvas { position: relative; background: #080d1a; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <h2>&#9651; Owner Network</h2>
+      <p>Commercial RE Intelligence</p>
+    </div>
+    <div class="sidebar-nav">
+      <a href="/"         class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Dashboard</a>
+      <a href="/graph"    class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Graph View</a>
+      <a href="/upload"   class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>Upload CSV</a>
+      <a href="/analysis" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Analysis</a>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title">Graph View</span>
+      <div class="topbar-actions">
+        <button class="btn btn-secondary btn-sm" onclick="gv.fitAll()">&#8689; Fit All</button>
+        <button class="btn btn-secondary btn-sm" onclick="gv.togglePhysics()">&#9883; Physics</button>
+        <button class="btn btn-secondary btn-sm" onclick="gv.screenshot()">&#128247; Screenshot</button>
+        <button class="btn btn-primary btn-sm" onclick="gv.reload()">&#8635; Reload</button>
+      </div>
+    </div>
+
+    <div class="graph-shell flex">
+
+      <!-- Left filter panel -->
+      <div class="graph-left-panel">
+
+        <!-- Node type filters -->
+        <div class="panel-section">
+          <div class="panel-title">Node Types</div>
+          <div class="legend">
+            <label class="filter-toggle">
+              <span class="flex items-center gap-2">
+                <span class="legend-dot" style="background:#1d4ed8;border:2px solid #3b82f6"></span>
+                People
+              </span>
+              <input type="checkbox" checked data-type="Person" onchange="gv.applyFilters()" />
+            </label>
+            <label class="filter-toggle">
+              <span class="flex items-center gap-2">
+                <span class="legend-sq" style="background:#c2410c;border:2px solid #f97316"></span>
+                Buildings
+              </span>
+              <input type="checkbox" checked data-type="Building" onchange="gv.applyFilters()" />
+            </label>
+            <label class="filter-toggle">
+              <span class="flex items-center gap-2">
+                <span class="legend-di" style="background:#15803d;border:2px solid #22c55e"></span>
+                Companies
+              </span>
+              <input type="checkbox" checked data-type="Company" onchange="gv.applyFilters()" />
+            </label>
+          </div>
+        </div>
+
+        <!-- Relationship filters -->
+        <div class="panel-section">
+          <div class="panel-title">Relationships</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label class="filter-toggle">
+              <span style="font-size:12px">OWNS</span>
+              <input type="checkbox" checked data-rel="OWNS" onchange="gv.applyFilters()" />
+            </label>
+            <label class="filter-toggle">
+              <span style="font-size:12px">WORKS_AT</span>
+              <input type="checkbox" checked data-rel="WORKS_AT" onchange="gv.applyFilters()" />
+            </label>
+            <label class="filter-toggle">
+              <span style="font-size:12px">KNOWS</span>
+              <input type="checkbox" checked data-rel="KNOWS" onchange="gv.applyFilters()" />
+            </label>
+            <label class="filter-toggle">
+              <span style="font-size:12px">FAMILY_OF</span>
+              <input type="checkbox" checked data-rel="FAMILY_OF" onchange="gv.applyFilters()" />
+            </label>
+            <label class="filter-toggle">
+              <span style="font-size:12px">FOLLOWS</span>
+              <input type="checkbox" checked data-rel="FOLLOWS" onchange="gv.applyFilters()" />
+            </label>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div class="panel-section">
+          <div class="panel-title">Search Node</div>
+          <input type="text" id="node-search" class="form-control" placeholder="Name or address…" oninput="gv.searchNode(this.value)" />
+        </div>
+
+        <!-- Stats -->
+        <div class="panel-section">
+          <div class="panel-title">Graph Stats</div>
+          <div style="font-size:12px;color:var(--text-muted);line-height:2;">
+            <div>Nodes: <span id="gs-nodes" style="color:var(--text-primary)">—</span></div>
+            <div>Edges: <span id="gs-edges" style="color:var(--text-primary)">—</span></div>
+          </div>
+        </div>
+
+      </div><!-- /left panel -->
+
+      <!-- Graph canvas -->
+      <div id="graph-canvas" style="flex:1;position:relative;">
+        <div class="loading-overlay" id="graph-loading">
+          <div style="text-align:center;">
+            <div class="spinner" style="width:40px;height:40px;border-width:3px;margin:0 auto 12px;"></div>
+            <div style="color:var(--text-muted)">Loading graph…</div>
+          </div>
+        </div>
+        <div id="vis-container" style="width:100%;height:100%;"></div>
+        <div id="empty-msg" class="hidden" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+          <div style="font-size:48px">&#9651;</div>
+          <div style="color:var(--text-muted);font-size:15px;">No data yet.</div>
+          <a href="/upload" class="btn btn-primary">Upload CSV to get started</a>
+        </div>
+      </div>
+
+      <!-- Right detail panel -->
+      <div class="graph-right-panel" id="detail-panel" style="display:none;">
+        <div class="flex justify-between items-center mb-3">
+          <div class="panel-title" style="margin:0">Node Details</div>
+          <button onclick="closeDetail()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;">&#10005;</button>
+        </div>
+        <div id="detail-body"></div>
+      </div>
+
+    </div><!-- /graph-shell -->
+  </div><!-- /main -->
+</div><!-- /app-shell -->
+
+<script src="/js/main.js"></script>
+<script>
+const gv = (() => {
+  let network = null;
+  let allNodes = [];
+  let allEdges = [];
+  let physicsEnabled = true;
+
+  const container    = document.getElementById('vis-container');
+  const loadingEl    = document.getElementById('graph-loading');
+  const emptyEl      = document.getElementById('empty-msg');
+  const detailPanel  = document.getElementById('detail-panel');
+  const detailBody   = document.getElementById('detail-body');
+  const gsNodes      = document.getElementById('gs-nodes');
+  const gsEdges      = document.getElementById('gs-edges');
+
+  const visNodes = new vis.DataSet();
+  const visEdges = new vis.DataSet();
+
+  function nodeTypeStyle(type, degree = 1) {
+    const base = NODE_STYLE[type] || { color: { background: '#475569', border: '#64748b', highlight: { background: '#64748b', border: '#94a3b8' } }, shape: 'dot', size: 12 };
+    const size = Math.min(10 + Math.sqrt(degree) * 3, 40);
+    return { ...base, size };
+  }
+
+  function edgeTypeStyle(type) {
+    return EDGE_STYLE[type] || DEFAULT_EDGE_STYLE;
+  }
+
+  function buildVisNode(n, degree) {
+    const style = nodeTypeStyle(n.type, degree);
+    return {
+      id:    n.id,
+      label: n.label,
+      title: buildTooltip(n),
+      ...style,
+      font: { color: '#f1f5f9', size: 11, face: 'Inter, system-ui' },
+      _raw: n,
+    };
+  }
+
+  function buildVisEdge(e) {
+    const style = edgeTypeStyle(e.type);
+    return {
+      id:     e.id,
+      from:   e.from,
+      to:     e.to,
+      label:  e.type,
+      title:  e.type + (e.props && e.props.role ? ': ' + e.props.role : ''),
+      arrows: { to: { enabled: true, scaleFactor: 0.6 } },
+      font:   { color: '#64748b', size: 9, align: 'middle', strokeWidth: 0 },
+      ...style,
+      _raw: e,
+    };
+  }
+
+  function buildTooltip(n) {
+    const p = n.props || {};
+    let html = `<strong>${escHtml(n.label)}</strong><br><em>${n.type}</em>`;
+    if (p.email)     html += `<br>&#9993; ${escHtml(p.email)}`;
+    if (p.linkedin)  html += `<br>in ${escHtml(p.linkedin)}`;
+    if (p.twitter)   html += `<br>&#64; ${escHtml(p.twitter)}`;
+    if (p.address)   html += `<br>&#127968; ${escHtml(p.address)}`;
+    return html;
+  }
+
+  function computeDegrees(nodes, edges) {
+    const deg = {};
+    nodes.forEach(n => deg[n.id] = 0);
+    edges.forEach(e => {
+      deg[e.from] = (deg[e.from] || 0) + 1;
+      deg[e.to]   = (deg[e.to]   || 0) + 1;
+    });
+    return deg;
+  }
+
+  async function load() {
+    loadingEl.style.display = 'flex';
+    try {
+      const data = await apiFetch('/graph?limit=2000');
+      allNodes = data.nodes || [];
+      allEdges = data.edges || [];
+      renderGraph(allNodes, allEdges);
+    } catch (err) {
+      loadingEl.style.display = 'none';
+      emptyEl.classList.remove('hidden');
+      emptyEl.style.display = 'flex';
+      emptyEl.innerHTML = `<div style="color:var(--red);text-align:center;padding:24px;">${escHtml(err.message)}</div>`;
+    }
+  }
+
+  function renderGraph(nodes, edges) {
+    const deg = computeDegrees(nodes, edges);
+    visNodes.clear();
+    visEdges.clear();
+    visNodes.add(nodes.map(n => buildVisNode(n, deg[n.id] || 1)));
+    visEdges.add(edges.map(e => buildVisEdge(e)));
+
+    gsNodes.textContent = nodes.length;
+    gsEdges.textContent = edges.length;
+
+    if (!nodes.length) {
+      loadingEl.style.display = 'none';
+      emptyEl.classList.remove('hidden');
+      emptyEl.style.display = 'flex';
+      return;
+    }
+
+    emptyEl.classList.add('hidden');
+
+    if (network) {
+      network.destroy();
+    }
+
+    network = new vis.Network(container, { nodes: visNodes, edges: visEdges }, {
+      physics: {
+        enabled: true,
+        stabilization: { iterations: 200 },
+        barnesHut: {
+          gravitationalConstant: -8000,
+          centralGravity: 0.3,
+          springLength: 140,
+          springConstant: 0.04,
+          damping: 0.09,
+        },
+      },
+      interaction: {
+        hover: true,
+        tooltipDelay: 200,
+        hideEdgesOnDrag: nodes.length > 500,
+      },
+      layout: { improvedLayout: nodes.length < 200 },
+    });
+
+    network.on('click', params => {
+      if (params.nodes.length) {
+        const nodeId = params.nodes[0];
+        const node   = allNodes.find(n => n.id === nodeId);
+        if (node) showDetail(node, edges, nodes);
+      } else {
+        closeDetail();
+      }
+    });
+
+    network.once('stabilized', () => {
+      loadingEl.style.display = 'none';
+    });
+
+    // Fallback hide loader
+    setTimeout(() => { loadingEl.style.display = 'none'; }, 8000);
+  }
+
+  function showDetail(node, edges, nodes) {
+    const p = node.props || {};
+    const incoming = edges.filter(e => e.to   === node.id);
+    const outgoing = edges.filter(e => e.from === node.id);
+
+    const nodeName = id => {
+      const n = nodes.find(x => x.id === id);
+      return n ? n.label : id;
+    };
+
+    const relList = (rels, direction) => rels.map(e => {
+      const other = direction === 'out' ? nodeName(e.to) : nodeName(e.from);
+      return `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">
+        <span style="color:var(--text-muted)">${direction === 'out' ? '→' : '←'} ${e.type}</span>
+        <span style="float:right">${escHtml(other)}</span>
+      </div>`;
+    }).join('') || '<div style="color:var(--text-muted);font-size:12px;">None</div>';
+
+    detailBody.innerHTML = `
+      <div class="detail-field">
+        <div class="key">Name / Label</div>
+        <div class="val" style="font-size:16px;font-weight:700;">${escHtml(node.label)}</div>
+      </div>
+      <div class="detail-field">
+        <div class="key">Type</div>
+        <div class="val"><span class="badge badge-${node.type.toLowerCase()}">${node.type}</span></div>
+      </div>
+      ${p.email    ? `<div class="detail-field"><div class="key">Email</div><div class="val"><a href="mailto:${escHtml(p.email)}">${escHtml(p.email)}</a></div></div>` : ''}
+      ${p.linkedin ? `<div class="detail-field"><div class="key">LinkedIn</div><div class="val"><a href="https://${escHtml(p.linkedin)}" target="_blank">${escHtml(p.linkedin)}</a></div></div>` : ''}
+      ${p.twitter  ? `<div class="detail-field"><div class="key">Twitter</div><div class="val">${escHtml(p.twitter)}</div></div>` : ''}
+      ${p.instagram? `<div class="detail-field"><div class="key">Instagram</div><div class="val">${escHtml(p.instagram)}</div></div>` : ''}
+      ${p.facebook ? `<div class="detail-field"><div class="key">Facebook</div><div class="val">${escHtml(p.facebook)}</div></div>` : ''}
+      ${p.phone    ? `<div class="detail-field"><div class="key">Phone</div><div class="val">${escHtml(p.phone)}</div></div>` : ''}
+      ${p.address  ? `<div class="detail-field"><div class="key">Address</div><div class="val">${escHtml(p.address)}</div></div>` : ''}
+      ${p.type     ? `<div class="detail-field"><div class="key">Building Type</div><div class="val">${escHtml(p.type)}</div></div>` : ''}
+      <div class="detail-field">
+        <div class="key">Connections (${incoming.length + outgoing.length})</div>
+        <div style="max-height:200px;overflow-y:auto;margin-top:4px;">
+          ${relList(outgoing, 'out')}
+          ${relList(incoming, 'in')}
+        </div>
+      </div>
+      <div class="mt-4" style="display:flex;gap:8px;">
+        <a href="/analysis?focus=${encodeURIComponent(node.label)}" class="btn btn-secondary btn-sm w-full" style="justify-content:center">
+          Analyze Paths
+        </a>
+      </div>
+    `;
+
+    detailPanel.style.display = 'flex';
+    detailPanel.style.flexDirection = 'column';
+  }
+
+  function closeDetail() {
+    detailPanel.style.display = 'none';
+  }
+
+  function applyFilters() {
+    const enabledTypes = [...document.querySelectorAll('[data-type]:checked')].map(el => el.dataset.type);
+    const enabledRels  = [...document.querySelectorAll('[data-rel]:checked')].map(el => el.dataset.rel);
+
+    const filteredNodes = allNodes.filter(n => enabledTypes.includes(n.type));
+    const nodeIds = new Set(filteredNodes.map(n => n.id));
+    const filteredEdges = allEdges.filter(e =>
+      enabledRels.includes(e.type) && nodeIds.has(e.from) && nodeIds.has(e.to)
+    );
+
+    const deg = computeDegrees(filteredNodes, filteredEdges);
+    visNodes.clear();
+    visEdges.clear();
+    visNodes.add(filteredNodes.map(n => buildVisNode(n, deg[n.id] || 1)));
+    visEdges.add(filteredEdges.map(e => buildVisEdge(e)));
+
+    gsNodes.textContent = filteredNodes.length;
+    gsEdges.textContent = filteredEdges.length;
+  }
+
+  function searchNode(query) {
+    if (!network || !query) {
+      visNodes.update(allNodes.map(n => ({ id: n.id, opacity: 1 })));
+      return;
+    }
+    const q = query.toLowerCase();
+    const match = allNodes.find(n => n.label.toLowerCase().includes(q));
+    if (match) {
+      network.focus(match.id, { scale: 1.5, animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+      network.selectNodes([match.id]);
+    }
+  }
+
+  function fitAll() {
+    if (network) network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+  }
+
+  function togglePhysics() {
+    physicsEnabled = !physicsEnabled;
+    if (network) network.setOptions({ physics: { enabled: physicsEnabled } });
+  }
+
+  function screenshot() {
+    if (!network) return;
+    const canvas = container.querySelector('canvas');
+    if (!canvas) return;
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'owner-network-graph.png';
+    a.click();
+  }
+
+  function reload() { load(); }
+
+  load();
+
+  return { applyFilters, searchNode, fitAll, togglePhysics, screenshot, reload };
+})();
+
+function closeDetail() {
+  document.getElementById('detail-panel').style.display = 'none';
+}
+</script>
+</body>
+</html>

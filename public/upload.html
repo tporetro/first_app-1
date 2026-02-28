@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Owner Network – Upload CSV</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <h2>&#9651; Owner Network</h2>
+      <p>Commercial RE Intelligence</p>
+    </div>
+    <div class="sidebar-nav">
+      <a href="/"         class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Dashboard</a>
+      <a href="/graph"    class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Graph View</a>
+      <a href="/upload"   class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>Upload CSV</a>
+      <a href="/analysis" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Analysis</a>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title">Upload CSV</span>
+    </div>
+
+    <div class="content" style="max-width:800px;">
+
+      <div id="alert-box"></div>
+
+      <!-- Drop zone -->
+      <div class="card mb-4">
+        <div class="card-title">Import Building Owners</div>
+
+        <div class="drop-zone" id="drop-zone">
+          <div class="icon">&#128196;</div>
+          <p style="font-size:16px;font-weight:600;color:var(--text-primary)">Drag &amp; drop your CSV here</p>
+          <p>or click to browse</p>
+          <p class="hint">Max 25 MB &bull; UTF-8 encoded &bull; First row must be column headers</p>
+        </div>
+        <input type="file" id="file-input" accept=".csv" style="display:none" />
+
+        <div id="file-info" class="hidden mt-4" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg-elevated);border-radius:8px;">
+          <span style="font-size:24px">&#128196;</span>
+          <div style="flex:1">
+            <div id="file-name" style="font-weight:600"></div>
+            <div id="file-size" style="font-size:12px;color:var(--text-muted)"></div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="clearFile()">&#10005; Remove</button>
+        </div>
+
+        <div id="progress-wrap" class="hidden mt-4">
+          <div style="font-size:13px;margin-bottom:6px;" id="progress-label">Uploading…</div>
+          <div class="progress"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="mt-4" style="display:flex;gap:10px;">
+          <button class="btn btn-primary" id="upload-btn" onclick="uploadFile()" disabled>
+            &#8679; Import to Neo4j
+          </button>
+          <a href="/sample_owners.csv" download class="btn btn-secondary">
+            &#8681; Download Sample CSV
+          </a>
+        </div>
+      </div>
+
+      <!-- Column guide -->
+      <div class="card">
+        <div class="card-title">CSV Column Reference</div>
+        <p style="color:var(--text-muted);font-size:13px;margin:0 0 16px;">
+          All columns except <code style="background:var(--bg-elevated);padding:1px 5px;border-radius:4px;">owner_name</code> are optional.
+          Multi-value fields use <strong>semicolons</strong> as separators within a cell.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Column</th><th>Required</th><th>Format / Example</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>owner_name</code></td>   <td><span style="color:var(--red)">Yes</span></td><td>John Smith</td></tr>
+              <tr><td><code>email</code></td>        <td>No</td><td>john@example.com</td></tr>
+              <tr><td><code>linkedin</code></td>     <td>No</td><td>linkedin.com/in/johnsmith</td></tr>
+              <tr><td><code>twitter</code></td>      <td>No</td><td>@johnsmith</td></tr>
+              <tr><td><code>instagram</code></td>    <td>No</td><td>@johnsmith_re</td></tr>
+              <tr><td><code>facebook</code></td>     <td>No</td><td>facebook.com/johnsmith</td></tr>
+              <tr><td><code>phone</code></td>        <td>No</td><td>312-555-0100</td></tr>
+              <tr><td><code>building_address</code></td><td>No</td><td>500 Michigan Ave Chicago IL</td></tr>
+              <tr><td><code>building_name</code></td><td>No</td><td>Harrison Tower</td></tr>
+              <tr><td><code>building_type</code></td><td>No</td><td>office / retail / industrial / mixed</td></tr>
+              <tr><td><code>connections</code></td>  <td>No</td><td>Jane Doe;Bob Smith;Alice Brown</td></tr>
+              <tr><td><code>family</code></td>       <td>No</td><td>Mary Smith:wife;Tom Smith:son</td></tr>
+              <tr><td><code>work_history</code></td> <td>No</td><td>Acme Corp:CEO:2018-present;BigCo:VP:2012-2018</td></tr>
+              <tr><td><code>followers</code></td>    <td>No</td><td>David Lee;Sarah Park (people who follow this owner)</td></tr>
+              <tr><td><code>employer</code></td>     <td>No</td><td>Capital RE Group (current employer shorthand)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="/js/main.js"></script>
+<script>
+  const dropZone  = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const uploadBtn = document.getElementById('upload-btn');
+  const alertBox  = document.getElementById('alert-box');
+  let selectedFile = null;
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  function setFile(file) {
+    if (!file.name.match(/\.csv$/i)) {
+      showAlert(alertBox, 'Please select a .csv file.', 'error');
+      return;
+    }
+    selectedFile = file;
+    document.getElementById('file-name').textContent = file.name;
+    document.getElementById('file-size').textContent = (file.size / 1024).toFixed(1) + ' KB';
+    document.getElementById('file-info').classList.remove('hidden');
+    document.getElementById('file-info').style.display = 'flex';
+    uploadBtn.disabled = false;
+    alertBox.innerHTML = '';
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    fileInput.value = '';
+    document.getElementById('file-info').classList.add('hidden');
+    uploadBtn.disabled = true;
+  }
+
+  async function uploadFile() {
+    if (!selectedFile) return;
+    uploadBtn.disabled = true;
+    alertBox.innerHTML = '';
+
+    const progressWrap = document.getElementById('progress-wrap');
+    const progressBar  = document.getElementById('progress-bar');
+    const progressLabel = document.getElementById('progress-label');
+    progressWrap.classList.remove('hidden');
+    progressWrap.style.display = 'block';
+    progressBar.style.width = '20%';
+    progressLabel.textContent = 'Uploading file…';
+
+    const formData = new FormData();
+    formData.append('csv', selectedFile);
+
+    try {
+      progressBar.style.width = '50%';
+      progressLabel.textContent = 'Parsing and importing into Neo4j…';
+
+      const result = await apiFetch('/upload', { method: 'POST', body: formData });
+
+      progressBar.style.width = '100%';
+      progressLabel.textContent = 'Done!';
+
+      let msg = `Successfully imported <strong>${result.imported}</strong> owner record(s).`;
+      if (result.skipped) msg += ` Skipped ${result.skipped} (no owner_name).`;
+      if (result.errors && result.errors.length) {
+        msg += `<br><br><strong>Errors (${result.errors.length}):</strong><br>` +
+          result.errors.slice(0, 5).map(e => escHtml(e.record + ': ' + e.error)).join('<br>');
+      }
+      showAlert(alertBox, msg, 'success');
+      clearFile();
+    } catch (err) {
+      progressBar.style.width = '100%';
+      progressBar.style.background = 'var(--red)';
+      showAlert(alertBox, 'Import failed: ' + err.message, 'error');
+    } finally {
+      uploadBtn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>

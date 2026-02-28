@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Owner Network – Analysis</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+  <style>
+    .analysis-layout { display: grid; grid-template-columns: 340px 1fr; gap: 20px; height: calc(100vh - 56px - 48px); overflow: hidden; }
+    .analysis-left  { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; padding: 24px 0 24px 24px; }
+    .analysis-right { overflow-y: auto; padding: 24px 24px 24px 0; }
+    #path-canvas { width: 100%; height: 380px; background: #080d1a; border-radius: 12px; border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <h2>&#9651; Owner Network</h2>
+      <p>Commercial RE Intelligence</p>
+    </div>
+    <div class="sidebar-nav">
+      <a href="/"         class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Dashboard</a>
+      <a href="/graph"    class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Graph View</a>
+      <a href="/upload"   class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>Upload CSV</a>
+      <a href="/analysis" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Analysis</a>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title">Network Analysis</span>
+    </div>
+
+    <div class="analysis-layout">
+
+      <!-- Left: tool panels -->
+      <div class="analysis-left">
+
+        <!-- Shortest Path -->
+        <div class="card">
+          <div class="card-title">&#9974; Shortest Path</div>
+          <div class="form-group">
+            <label class="form-label">From Person</label>
+            <select id="sp-from" class="form-control"><option value="">— select —</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">To Person</label>
+            <select id="sp-to" class="form-control"><option value="">— select —</option></select>
+          </div>
+          <button class="btn btn-primary w-full" onclick="runShortestPath()">Find Shortest Path</button>
+          <div id="sp-status" style="margin-top:10px;font-size:13px;color:var(--text-muted);"></div>
+        </div>
+
+        <!-- Influence Analysis -->
+        <div class="card">
+          <div class="card-title">&#11088; Influence Network</div>
+          <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">
+            Ranks people by total connection count (degree centrality). The most connected nodes are your highest-value targets.
+          </p>
+          <button class="btn btn-primary w-full" onclick="runInfluence()">Run Influence Analysis</button>
+        </div>
+
+        <!-- Community Detection -->
+        <div class="card">
+          <div class="card-title">&#128203; Community Detection</div>
+          <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">
+            Finds clusters of people who are more connected to each other than to the rest of the network.
+          </p>
+          <button class="btn btn-primary w-full" onclick="runCommunities()">Detect Communities</button>
+        </div>
+
+      </div><!-- /left -->
+
+      <!-- Right: results -->
+      <div class="analysis-right" id="results-area">
+
+        <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);flex-direction:column;gap:12px;">
+          <div style="font-size:48px;opacity:.3;">&#9741;</div>
+          <div>Run an analysis to see results here.</div>
+        </div>
+
+      </div><!-- /right -->
+
+    </div><!-- /analysis-layout -->
+  </div><!-- /main -->
+</div><!-- /app-shell -->
+
+<script src="/js/main.js"></script>
+<script>
+let pathNetwork = null;
+let people = [];
+
+// Pre-load person names for dropdowns
+async function loadPeople() {
+  try {
+    people = await apiFetch('/people');
+    const opts = people.map(name => `<option value="${escHtml(name)}">${escHtml(name)}</option>`).join('');
+    document.getElementById('sp-from').innerHTML = '<option value="">— select —</option>' + opts;
+    document.getElementById('sp-to').innerHTML   = '<option value="">— select —</option>' + opts;
+
+    // Pre-fill from URL param
+    const params = new URLSearchParams(location.search);
+    const focus = params.get('focus');
+    if (focus) {
+      document.getElementById('sp-from').value = focus;
+    }
+  } catch (err) {
+    console.error('Could not load people:', err);
+  }
+}
+
+// ---- Shortest Path ----
+async function runShortestPath() {
+  const from = document.getElementById('sp-from').value;
+  const to   = document.getElementById('sp-to').value;
+  const status = document.getElementById('sp-status');
+
+  if (!from || !to) { status.textContent = 'Select both From and To nodes.'; return; }
+  if (from === to)   { status.textContent = 'From and To must be different people.'; return; }
+
+  status.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;vertical-align:middle;"></span> Finding path…';
+  showLoading();
+
+  try {
+    const result = await apiFetch(`/analysis/shortest-path?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+
+    if (!result.found) {
+      status.textContent = result.message;
+      showPathResult(null, from, to);
+      return;
+    }
+
+    status.innerHTML = `<span style="color:var(--green)">&#10003; Found! Degrees of separation: <strong>${result.pathLength}</strong></span>`;
+    showPathResult(result, from, to);
+  } catch (err) {
+    status.innerHTML = `<span style="color:var(--red)">Error: ${escHtml(err.message)}</span>`;
+  }
+}
+
+function showPathResult(result, from, to) {
+  const area = document.getElementById('results-area');
+
+  if (!result) {
+    area.innerHTML = `
+      <div class="card">
+        <div class="card-title">Shortest Path Result</div>
+        <div class="alert alert-warn">No path found between <strong>${escHtml(from)}</strong> and <strong>${escHtml(to)}</strong>. They may not be connected in the network.</div>
+      </div>`;
+    return;
+  }
+
+  // Build node list string
+  const pathStr = result.nodes.map((n, i) => {
+    const isStart = i === 0;
+    const isEnd   = i === result.nodes.length - 1;
+    const color   = isStart ? '#38bdf8' : isEnd ? '#f97316' : '#a78bfa';
+    return `<span style="display:inline-block;padding:3px 10px;border-radius:9999px;background:${color}22;color:${color};font-weight:600;font-size:12px;">${escHtml(n.label)}</span>`;
+  }).join(' <span style="color:var(--text-muted)">→</span> ');
+
+  area.innerHTML = `
+    <div class="card mb-4">
+      <div class="card-title">Shortest Path: ${escHtml(from)} → ${escHtml(to)}</div>
+      <div class="alert alert-info mb-3">
+        <strong>${result.pathLength} degrees</strong> of separation. Path:
+      </div>
+      <div style="margin-bottom:16px;line-height:2.2;">${pathStr}</div>
+      <div id="path-canvas"></div>
+    </div>`;
+
+  // Render path as mini vis-network
+  setTimeout(() => renderPathGraph(result), 100);
+}
+
+function renderPathGraph(result) {
+  const container = document.getElementById('path-canvas');
+  if (!container) return;
+
+  const visNodes = new vis.DataSet(result.nodes.map((n, i) => ({
+    id:    n.id,
+    label: n.label,
+    color: {
+      background: i === 0 ? '#1d4ed8' : i === result.nodes.length - 1 ? '#c2410c' : '#6d28d9',
+      border: i === 0 ? '#3b82f6' : i === result.nodes.length - 1 ? '#f97316' : '#8b5cf6',
+    },
+    shape: 'dot', size: i === 0 || i === result.nodes.length - 1 ? 22 : 16,
+    font:  { color: '#f1f5f9', size: 12 },
+  })));
+
+  const visEdges = new vis.DataSet(result.edges.map(e => ({
+    from: e.from, to: e.to,
+    label: e.type,
+    arrows: { to: { enabled: true, scaleFactor: 0.7 } },
+    color: { color: '#38bdf8' },
+    font:  { color: '#94a3b8', size: 10, align: 'middle' },
+    width: 2,
+  })));
+
+  if (pathNetwork) pathNetwork.destroy();
+  pathNetwork = new vis.Network(container, { nodes: visNodes, edges: visEdges }, {
+    physics: { enabled: true, stabilization: { iterations: 100 } },
+    layout:  { hierarchical: { enabled: true, direction: 'LR', sortMethod: 'directed', levelSeparation: 140, nodeSpacing: 80 } },
+  });
+}
+
+// ---- Influence ----
+async function runInfluence() {
+  showLoading();
+  try {
+    const scores = await apiFetch('/analysis/influence?limit=30');
+    const area = document.getElementById('results-area');
+
+    if (!scores.length) {
+      area.innerHTML = '<div class="alert alert-warn">No people found. Upload a CSV first.</div>';
+      return;
+    }
+
+    const maxDeg = scores[0].degree || 1;
+
+    area.innerHTML = `
+      <div class="card">
+        <div class="card-title">&#11088; Influence Rankings (Top ${scores.length})</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 16px;">
+          Ranked by total connections (degree centrality). Higher score = more network reach.
+        </p>
+        <div>
+          ${scores.map((s, i) => `
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+              <div style="width:28px;text-align:center;font-size:13px;font-weight:700;color:${i < 3 ? '#f97316' : 'var(--text-muted)'}">${i+1}</div>
+              <div style="flex:1;">
+                <div style="font-weight:600;font-size:13px;">${escHtml(s.name)}</div>
+                ${s.email ? `<div style="font-size:11px;color:var(--text-muted)">${escHtml(s.email)}</div>` : ''}
+              </div>
+              <div style="width:120px;">
+                <div class="influence-bar-bg">
+                  <div class="influence-bar-fill" style="width:${Math.round(s.degree / maxDeg * 100)}%;background:${i < 3 ? '#f97316' : 'var(--accent)'}"></div>
+                </div>
+                <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-top:2px;">${s.degree} links</div>
+              </div>
+              ${s.linkedin ? `<a href="https://${escHtml(s.linkedin)}" target="_blank" style="font-size:11px;padding:3px 8px;background:var(--bg-elevated);border-radius:4px;color:var(--accent);">LinkedIn</a>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  } catch (err) {
+    document.getElementById('results-area').innerHTML =
+      `<div class="alert alert-error">Error: ${escHtml(err.message)}</div>`;
+  }
+}
+
+// ---- Communities ----
+async function runCommunities() {
+  showLoading();
+  try {
+    const communities = await apiFetch('/analysis/communities');
+    const area = document.getElementById('results-area');
+
+    if (!communities.length) {
+      area.innerHTML = '<div class="alert alert-warn">No people found. Upload a CSV first.</div>';
+      return;
+    }
+
+    area.innerHTML = `
+      <div class="card">
+        <div class="card-title">&#128203; Community Detection (${communities.length} communities found)</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 16px;">
+          Groups of people who are more connected to each other than to the rest of the network.
+          Larger communities = stronger collective influence.
+        </p>
+        ${communities.map((c, idx) => {
+          const color = communityColor(idx);
+          return `
+            <div style="margin-bottom:16px;padding:14px;border:1px solid var(--border);border-radius:10px;border-left:4px solid ${color};">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="font-weight:700;color:${color};">Community ${idx + 1}</div>
+                <div style="font-size:12px;color:var(--text-muted);">${c.size} member${c.size !== 1 ? 's' : ''}</div>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                ${c.members.map(m => `
+                  <span class="community-chip" style="background:${color}22;color:${color};">${escHtml(m.name || '—')}</span>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>`;
+  } catch (err) {
+    document.getElementById('results-area').innerHTML =
+      `<div class="alert alert-error">Error: ${escHtml(err.message)}</div>`;
+  }
+}
+
+function showLoading() {
+  document.getElementById('results-area').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;height:100%;">
+      <div class="spinner" style="width:36px;height:36px;border-width:3px;"></div>
+    </div>`;
+}
+
+loadPeople();
+</script>
+</body>
+</html>
