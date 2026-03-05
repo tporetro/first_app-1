@@ -1,4 +1,4 @@
-class AddCrmFieldsToContacts < ActiveRecord::Migration
+class AddCrmFieldsToContacts < ActiveRecord::Migration[7.2]
   def change
     add_column :contacts, :deal_status, :string, default: 'prospecting'
     # prospecting | in_negotiation | won | lost | do_not_contact

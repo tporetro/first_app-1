@@ -1,4 +1,4 @@
-class AddUniquenessIndexToStormEvents < ActiveRecord::Migration
+class AddUniquenessIndexToStormEvents < ActiveRecord::Migration[7.2]
   def change
     # Prevents duplicate storm events from repeated NOAA monitor cycles.
     # Composite key: event_date + state + metro_area.

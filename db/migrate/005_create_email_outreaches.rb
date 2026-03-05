@@ -1,4 +1,4 @@
-class CreateEmailOutreaches < ActiveRecord::Migration
+class CreateEmailOutreaches < ActiveRecord::Migration[7.2]
   def change
     create_table :email_outreaches do |t|
       t.references :property,    null: false

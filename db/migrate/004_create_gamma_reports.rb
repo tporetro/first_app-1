@@ -1,4 +1,4 @@
-class CreateGammaReports < ActiveRecord::Migration
+class CreateGammaReports < ActiveRecord::Migration[7.2]
   def change
     create_table :gamma_reports do |t|
       t.references :property, null: false

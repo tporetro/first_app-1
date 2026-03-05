@@ -1,5 +1,5 @@
 # Tracks Mailgun delivery events and reply detection (open, click, delivered, replied)
-class CreateEmailCampaigns < ActiveRecord::Migration
+class CreateEmailCampaigns < ActiveRecord::Migration[7.2]
   def change
     create_table :email_campaigns do |t|
       t.references :email_outreach, null: false

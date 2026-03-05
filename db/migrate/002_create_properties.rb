@@ -1,4 +1,4 @@
-class CreateProperties < ActiveRecord::Migration
+class CreateProperties < ActiveRecord::Migration[7.2]
   def change
     create_table :properties do |t|
       t.references :storm_event, null: false
