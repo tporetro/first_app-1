@@ -47,7 +47,7 @@ class ResendEmailService
     raise 'RESEND_API_KEY not set' unless api_key
 
     subject = build_subject(lead, variant)
-    html    = build_html(lead, report_url)
+    html    = build_html(lead, report_url, variant: variant)
 
     payload = {
       from:    FROM,
@@ -67,12 +67,44 @@ class ResendEmailService
     { success: false, error: e.message }
   end
 
-  # Variant subject lines for A/B/C/D testing (mirrors reference TypeScript analytics)
+  # Variant subject lines for A/B/C/D/E/F testing
   SUBJECT_VARIANTS = {
     'a' => 'Confidential: Storm Damage Intelligence Report — %<address>s',
     'b' => 'Urgent: Hidden Hail Damage Risk at %<address>s',
     'c' => 'Forensic Assessment Ready — %<address>s [%<date>s Storm]',
-    'd' => '%<owner>s — Your %<address>s Property Was in the Hail Swath'
+    'd' => '%<owner>s — Your %<address>s Property Was in the Hail Swath',
+    'e' => '%<owner>s — The Garden Ridge Founder Was Skeptical Too',
+    'f' => '%<owner>s — The State of Texas Had the Same Roof Problem'
+  }.freeze
+
+  # Verified client case studies — signed reference letters on file
+  TESTIMONIALS = {
+    garden_ridge: {
+      client:    'Eric W. White, Founder & CEO — Garden Ridge Pottery',
+      location:  'Schertz, TX',
+      sector:    'commercial',
+      situation: 'Unaware buildings had sustained hail damage. Initially skeptical.',
+      carrier:   'Claim disputed by carrier',
+      recovery:  '$4.2 million',
+      quote:     'After showing us the map of the storm, we gave Mr. Johnson permission to inspect. ' \
+                 'To our surprise, the roofs, wall panels, and AC units were all heavily damaged by hail. ' \
+                 'After meeting with our insurance company\'s adjuster, Mr. Johnson was able to get us ' \
+                 'over four million dollars to repair the damage.',
+      signatory: 'Eric W. White, Founder/CEO, Garden Ridge Pottery'
+    },
+    region_13: {
+      client:    'Luke Martin, Executive Director — Texas Education Service Center Region 13',
+      location:  'Austin, TX (State of Texas)',
+      sector:    'government / education',
+      situation: 'Active roof leaks — staff scrambled with tarps to protect equipment every time it rained. ' \
+                 'Underlying hail damage was undetected. Carrier denied the claim outright.',
+      carrier:   'Denied outright',
+      recovery:  '$800,000+',
+      quote:     'Thanks to Michael we received $1.2 million from hail damage we were unaware of. ' \
+                 'Large insurance claims can feel daunting at times. Thanks to Michael\'s years of experience ' \
+                 'he was able to tell us ahead of time what was going to happen and why — and he was right every time.',
+      signatory: 'Luke Martin, Executive Director, Texas Education Service Center Region 13'
+    }
   }.freeze
 
   private
@@ -85,7 +117,111 @@ class ResendEmailService
            date:    lead[:storm_date] || Date.today.strftime('%b %-d'))
   end
 
-  def self.build_html(lead, report_url)
+  def self.build_html(lead, report_url, variant: 'a')
+    case variant.to_s
+    when 'e' then build_html_garden_ridge(lead, report_url)
+    when 'f' then build_html_region_13(lead, report_url)
+    else          build_html_standard(lead, report_url)
+    end
+  end
+
+  # Variant E — Garden Ridge story lead (commercial targets)
+  def self.build_html_garden_ridge(lead, report_url)
+    first_name = lead[:human_owner_name]&.split&.first || 'there'
+    address    = lead[:address]
+    t          = TESTIMONIALS[:garden_ridge]
+
+    <<~HTML
+      <div style="font-family: Arial, sans-serif; max-width: 640px; margin: auto; color: #222; line-height: 1.6;">
+        <p>Hi #{first_name},</p>
+
+        <p>When we first approached Eric White — the founder of Garden Ridge — about a potential
+        hail claim on his original Schertz, TX stores, he was skeptical. He didn't think he had
+        a claim. His buildings looked fine.</p>
+
+        <p>We showed him the storm map. He let us inspect. The roofs, wall panels, and AC units
+        were all heavily damaged. <strong>His carrier paid #{t[:recovery]}.</strong></p>
+
+        <p>I'm reaching out because <strong>#{address}</strong> was in the documented path of the
+        same type of storm event — and in my experience, the properties that look fine from the
+        ground are often the ones sitting on the largest undetected claims.</p>
+
+        <p>We've prepared a confidential damage intelligence report for your property:</p>
+
+        <p style="text-align:center; margin: 32px 0;">
+          <a href="#{report_url}"
+             style="background-color:#c0392b; color:white; padding:14px 28px;
+                    text-decoration:none; border-radius:4px; font-weight:bold; font-size:16px;">
+            View Your Confidential Property Report &rarr;
+          </a>
+        </p>
+
+        <p>There's no obligation. Eric White's signed reference letter is available upon request.</p>
+
+        <p>Amy on my team will reach out within 24 hours to find a time that works.</p>
+
+        <p>Best regards,</p>
+        <p>
+          <strong>#{SENDER_NAME}</strong><br>
+          #{SENDER_TITLE}<br>
+          #{SENDER_COMPANY}<br>
+          #{SENDER_PHONE}
+        </p>
+      </div>
+    HTML
+  end
+
+  # Variant F — Region 13 / State of Texas story lead (public sector / education targets)
+  def self.build_html_region_13(lead, report_url)
+    first_name = lead[:human_owner_name]&.split&.first || 'there'
+    address    = lead[:address]
+    t          = TESTIMONIALS[:region_13]
+
+    <<~HTML
+      <div style="font-family: Arial, sans-serif; max-width: 640px; margin: auto; color: #222; line-height: 1.6;">
+        <p>Hi #{first_name},</p>
+
+        <p>The Texas Education Service Center Region 13 — where teachers from across the state
+        come for continuing education — had a roof problem everyone could see: every time it rained,
+        the entire staff dropped what they were doing to cover up millions of dollars of equipment
+        with tarps.</p>
+
+        <p>What they couldn't see was the hail damage underneath. Their carrier denied the claim
+        outright. <strong>We got them #{t[:recovery]}.</strong></p>
+
+        <p>Executive Director Luke Martin's signed letter is on file. He said Michael
+        &ldquo;was able to tell us ahead of time what was going to happen and why — and he was
+        right every time.&rdquo;</p>
+
+        <p>I'm reaching out because <strong>#{address}</strong> was in the documented path of a
+        significant hail event — and carrier denials on public-sector properties are more common
+        than most facilities directors realize.</p>
+
+        <p>We've prepared a confidential damage intelligence report for your property:</p>
+
+        <p style="text-align:center; margin: 32px 0;">
+          <a href="#{report_url}"
+             style="background-color:#1a3a6b; color:white; padding:14px 28px;
+                    text-decoration:none; border-radius:4px; font-weight:bold; font-size:16px;">
+            View Your Confidential Property Report &rarr;
+          </a>
+        </p>
+
+        <p>There's no cost and no obligation. Amy on my team will reach out within 24 hours
+        to schedule a call at your convenience.</p>
+
+        <p>Best regards,</p>
+        <p>
+          <strong>#{SENDER_NAME}</strong><br>
+          #{SENDER_TITLE}<br>
+          #{SENDER_COMPANY}<br>
+          #{SENDER_PHONE}
+        </p>
+      </div>
+    HTML
+  end
+
+  def self.build_html_standard(lead, report_url)
     first_name   = lead[:human_owner_name]&.split&.first || 'there'
     hail_size    = lead[:hail_size] || '1.75'
     county       = lead[:county]    || 'your county'

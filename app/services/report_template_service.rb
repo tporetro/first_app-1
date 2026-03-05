@@ -26,6 +26,17 @@ class ReportTemplateService
   # ── Claims filing window (months from storm date) ─────────────────────────
   CLAIM_WINDOW_MONTHS = 12
 
+  # ── Verified case studies — signed reference letters on file ─────────────
+  PROVEN_RESULTS = [
+    { label: 'Galveston Condo',         carrier_offer: '$0 (Denied outright)', recovery: '$16,000,000' },
+    { label: 'Houston Hotel',           carrier_offer: '$100,000',             recovery: '$5,500,000'  },
+    { label: 'Dallas Warehouse',        carrier_offer: '$92,000',              recovery: '$3,450,000'  },
+    { label: 'Garden Ridge Pottery (Original Schertz Location)',
+                                        carrier_offer: 'Disputed',             recovery: '$4,200,000'  },
+    { label: 'State of Texas — Region 13 ESC (Austin)',
+                                        carrier_offer: 'Denied outright',      recovery: '$800,000+'   }
+  ].freeze
+
   # ---------------------------------------------------------------------------
   # Individual Property Technical Report
   # ---------------------------------------------------------------------------
@@ -164,6 +175,28 @@ class ReportTemplateService
 
       ---
 
+      ## Proven Results
+
+      These are verified recoveries with signed reference letters on file.
+
+      | Property | Carrier's Offer | Our Recovery |
+      |---|---|---|
+      #{PROVEN_RESULTS.map { |r| "| #{r[:label]} | #{r[:carrier_offer]} | **#{r[:recovery]}** |" }.join("\n      ")}
+
+      > *"After showing us the map of the storm, Mr. Johnson and his team were given permission
+      > to inspect. To our surprise, the roofs, wall panels, and AC units were all heavily damaged
+      > by hail. Mr. Johnson was able to get us over four million dollars to repair the damage."*
+      >
+      > — **Eric W. White, Founder & CEO, Garden Ridge Pottery**
+
+      > *"Thanks to Michael we received $1.2 million from hail damage we were unaware of.
+      > He was able to tell us ahead of time what was going to happen and why — and he was right
+      > every time."*
+      >
+      > — **Luke Martin, Executive Director, Texas Education Service Center Region 13 (State of Texas)**
+
+      ---
+
       ## Recommended Next Step
 
       Request a complimentary forensic inspection. Our team comes to the property,
@@ -299,6 +332,28 @@ class ReportTemplateService
       - **General Contractor** — licensed restoration execution from permit to warranty
 
       **You pay nothing out of pocket until your claim is approved and funded.**
+
+      ---
+
+      ## Proven Results
+
+      These are verified recoveries with signed reference letters on file.
+
+      | Property | Carrier's Offer | Our Recovery |
+      |---|---|---|
+      #{PROVEN_RESULTS.map { |r| "| #{r[:label]} | #{r[:carrier_offer]} | **#{r[:recovery]}** |" }.join("\n      ")}
+
+      > *"After showing us the map of the storm, Mr. Johnson and his team were given permission
+      > to inspect. To our surprise, the roofs, wall panels, and AC units were all heavily damaged
+      > by hail. Mr. Johnson was able to get us over four million dollars to repair the damage."*
+      >
+      > — **Eric W. White, Founder & CEO, Garden Ridge Pottery**
+
+      > *"Thanks to Michael we received $1.2 million from hail damage we were unaware of.
+      > He was able to tell us ahead of time what was going to happen and why — and he was right
+      > every time."*
+      >
+      > — **Luke Martin, Executive Director, Texas Education Service Center Region 13 (State of Texas)**
 
       ---
 
