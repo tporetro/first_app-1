@@ -15,7 +15,7 @@ class CreateStormEvents < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :storm_events, :event_date
-    add_index :storm_events, :status
+    add_index :storm_events, :event_date unless index_exists?(:storm_events, :event_date)
+    add_index :storm_events, :status unless index_exists?(:storm_events, :status)
   end
 end

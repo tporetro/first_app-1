@@ -13,8 +13,8 @@ class CreateGammaReports < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :gamma_reports, :property_id
-    add_index :gamma_reports, :generation_id
-    add_index :gamma_reports, :status
+    add_index :gamma_reports, :property_id unless index_exists?(:gamma_reports, :property_id)
+    add_index :gamma_reports, :generation_id unless index_exists?(:gamma_reports, :generation_id)
+    add_index :gamma_reports, :status unless index_exists?(:gamma_reports, :status)
   end
 end

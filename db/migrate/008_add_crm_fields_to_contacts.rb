@@ -5,6 +5,6 @@ class AddCrmFieldsToContacts < ActiveRecord::Migration[7.2]
     add_column :contacts, :notes, :text
     add_column :contacts, :last_activity_at, :datetime
 
-    add_index :contacts, :deal_status
+    add_index :contacts, :deal_status unless index_exists?(:contacts, :deal_status)
   end
 end

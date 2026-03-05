@@ -16,8 +16,8 @@ class CreateEmailCampaigns < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :email_campaigns, :email_outreach_id
-    add_index :email_campaigns, :mailgun_message_id
-    add_index :email_campaigns, :status
+    add_index :email_campaigns, :email_outreach_id unless index_exists?(:email_campaigns, :email_outreach_id)
+    add_index :email_campaigns, :mailgun_message_id unless index_exists?(:email_campaigns, :mailgun_message_id)
+    add_index :email_campaigns, :status unless index_exists?(:email_campaigns, :status)
   end
 end

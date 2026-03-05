@@ -16,9 +16,9 @@ class CreateEmailOutreaches < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :email_outreaches, :property_id
-    add_index :email_outreaches, :contact_id
-    add_index :email_outreaches, :status
-    add_index :email_outreaches, :sent_at
+    add_index :email_outreaches, :property_id unless index_exists?(:email_outreaches, :property_id)
+    add_index :email_outreaches, :contact_id unless index_exists?(:email_outreaches, :contact_id)
+    add_index :email_outreaches, :status unless index_exists?(:email_outreaches, :status)
+    add_index :email_outreaches, :sent_at unless index_exists?(:email_outreaches, :sent_at)
   end
 end
