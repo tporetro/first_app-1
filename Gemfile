@@ -43,6 +43,7 @@ end
 
 group :production do
   gem 'pg'
+  gem 'mini_racer'  # V8 JS runtime for uglifier (asset precompilation on Render)
 end
 
 group :development, :test do
