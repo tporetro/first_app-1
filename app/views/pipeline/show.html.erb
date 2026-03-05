@@ -1,0 +1,196 @@
+<%= link_to '← All Storms', pipeline_index_path, class: 'back-link' %>
+
+<h1><%= @storm.metro_area %> — <%= @storm.event_date.strftime('%B %-d, %Y') %></h1>
+<p class="subtitle">
+  <%= @storm.hail_size %>" hail &nbsp;·&nbsp; <%= @storm.state %> &nbsp;·&nbsp;
+  <%= @storm.counties %> &nbsp;·&nbsp;
+  <span class="badge <%= @storm.status == 'complete' ? 'badge-green' : 'badge-amber' %>"><%= @storm.status %></span>
+  <% if @storm.notes.present? %>
+    &nbsp;·&nbsp; <em style="color:#64748b"><%= @storm.notes %></em>
+  <% end %>
+</p>
+
+<!-- Pipeline stats for this storm -->
+<%
+  props_count    = @properties.count
+  contacts_count = @contacts.count
+  sent_count     = EmailOutreach.where(property: @properties).where(followup_day: 0, status: 'sent').count
+  opened_count   = EmailCampaign.joins(:email_outreach).where(email_outreaches: { property_id: @properties.map(&:id) }).where.not(opened_at: nil).count rescue 0
+  clicked_count  = EmailCampaign.joins(:email_outreach).where(email_outreaches: { property_id: @properties.map(&:id) }).where.not(clicked_at: nil).count rescue 0
+  replied_count  = EmailCampaign.joins(:email_outreach).where(email_outreaches: { property_id: @properties.map(&:id) }).where.not(replied_at: nil).count rescue 0
+  reports_count  = @properties.select { |p| p.gamma_report.present? }.count
+%>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="label">Properties</div>
+    <div class="value"><%= props_count %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Contacts</div>
+    <div class="value"><%= contacts_count %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Reports</div>
+    <div class="value blue"><%= reports_count %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Emails Sent</div>
+    <div class="value"><%= sent_count %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Opened</div>
+    <div class="value green"><%= opened_count %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Clicked</div>
+    <div class="value green"><%= clicked_count %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Replied</div>
+    <div class="value amber"><%= replied_count %></div>
+  </div>
+  <% if sent_count > 0 %>
+  <div class="stat-card">
+    <div class="label">Open Rate</div>
+    <div class="value green"><%= (opened_count.to_f / sent_count * 100).round(1) %>%</div>
+  </div>
+  <% end %>
+</div>
+
+<!-- Variant optimizer -->
+<% if @variants.any? { |v| v[:sends] > 0 } %>
+  <h2>Variant Performance (Thompson Sampling)</h2>
+  <div class="variant-grid" style="margin-bottom:32px">
+    <% @variants.each do |v| %>
+      <% score = v[:score] || 0 %>
+      <div class="variant-card">
+        <div class="v-label">Variant <%= v[:variant].upcase %></div>
+        <div class="v-score"><%= v[:score] ? "#{v[:score]}%" : '—' %></div>
+        <div class="v-bar"><div class="v-fill" style="width:<%= [score, 100].min %>%"></div></div>
+        <div class="v-meta"><%= v[:sends] %> sends &nbsp;·&nbsp; <%= v[:successes] %> opens &nbsp;·&nbsp; <%= v[:failures] %> no-open</div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<!-- Properties table -->
+<div class="section-header">
+  <h2>Properties (<%= props_count %>)</h2>
+  <%= link_to 'View Reports →', pipeline_reports_path(@storm) if reports_count > 0 %>
+</div>
+
+<div class="table-wrap">
+  <% if @properties.empty? %>
+    <div class="empty">No properties identified yet. Phase 2 (CAD scrape) runs automatically on storm detection.</div>
+  <% else %>
+    <table>
+      <thead>
+        <tr>
+          <th>Address</th>
+          <th>City</th>
+          <th>County</th>
+          <th>Type</th>
+          <th>Sq Ft</th>
+          <th>Owner</th>
+          <th>Report</th>
+          <th>Email</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @properties.each do |prop| %>
+          <% outreach = prop.email_outreaches.min_by(&:created_at) %>
+          <% campaign = outreach&.email_campaign %>
+          <tr>
+            <td class="monospace"><%= prop.address %></td>
+            <td><%= prop.city %></td>
+            <td><%= prop.county %></td>
+            <td><span class="badge badge-slate"><%= prop.property_type || '—' %></span></td>
+            <td><%= prop.sq_ft ? number_with_delimiter(prop.sq_ft) : '—' %></td>
+            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              <%= prop.owner_entity || '—' %>
+            </td>
+            <td>
+              <% if prop.gamma_report %>
+                <%= link_to '📊 Open', prop.gamma_report.gamma_url, target: '_blank' %>
+              <% else %>
+                <span style="color:#475569">—</span>
+              <% end %>
+            </td>
+            <td>
+              <% if campaign %>
+                <% email_status = campaign.replied_at ? 'replied' : campaign.clicked_at ? 'clicked' :
+                                  campaign.opened_at ? 'opened' : campaign.delivered_at ? 'delivered' : 'sent' %>
+                <% badge = { 'replied' => 'badge-amber', 'clicked' => 'badge-green',
+                             'opened'  => 'badge-green', 'delivered' => 'badge-blue',
+                             'sent'    => 'badge-slate' }[email_status] %>
+                <span class="badge <%= badge %>"><%= email_status %></span>
+                <% if campaign.replied_at %>
+                  <span style="font-size:11px;color:#fbbf24;margin-left:4px">★ HOT</span>
+                <% end %>
+              <% elsif outreach&.status == 'failed' %>
+                <span class="badge badge-red">failed</span>
+              <% else %>
+                <span style="color:#475569">—</span>
+              <% end %>
+            </td>
+            <td>
+              <span class="badge badge-slate"><%= prop.status %></span>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>
+
+<!-- Contacts table -->
+<div class="section-header">
+  <h2>Contacts (<%= contacts_count %>)</h2>
+</div>
+
+<div class="table-wrap">
+  <% if @contacts.empty? %>
+    <div class="empty">No contacts enriched yet. Phase 3 runs after properties are identified.</div>
+  <% else %>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Title</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Company</th>
+          <th>Source</th>
+          <th>Confidence</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @contacts.each do |contact| %>
+          <tr>
+            <td><strong><%= contact.human_owner_name || '—' %></strong></td>
+            <td style="color:#94a3b8"><%= contact.owner_title || '—' %></td>
+            <td>
+              <% if contact.owner_email.present? %>
+                <a href="mailto:<%= contact.owner_email %>"><%= contact.owner_email %></a>
+              <% else %>
+                <span style="color:#475569">—</span>
+              <% end %>
+            </td>
+            <td><%= contact.owner_phone || '—' %></td>
+            <td><%= contact.parent_company || contact.owner_entity %></td>
+            <td>
+              <span class="badge badge-slate"><%= contact.enrichment_source || '—' %></span>
+            </td>
+            <td>
+              <% badge = contact.status == 'enriched' ? 'badge-green' :
+                         contact.status == 'low_confidence' ? 'badge-amber' : 'badge-slate' %>
+              <span class="badge <%= badge %>"><%= contact.status %></span>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

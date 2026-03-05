@@ -1,0 +1,119 @@
+<h1>Storm Lead Pipeline</h1>
+<p class="subtitle">Automated commercial roofing outreach — powered by Claude Code</p>
+
+<!-- Global stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="label">Storms Tracked</div>
+    <div class="value blue"><%= @stats[:total_storms] %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Properties ID'd</div>
+    <div class="value"><%= @stats[:total_properties] %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Contacts Enriched</div>
+    <div class="value"><%= @stats[:total_contacts] %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Emails Sent</div>
+    <div class="value"><%= @stats[:emails_sent] %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Opened</div>
+    <div class="value green"><%= @stats[:emails_opened] %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Clicked</div>
+    <div class="value green"><%= @stats[:emails_clicked] %></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Replied</div>
+    <div class="value amber"><%= @stats[:emails_replied] %></div>
+  </div>
+  <% if @stats[:emails_sent] > 0 %>
+  <div class="stat-card">
+    <div class="label">Open Rate</div>
+    <div class="value green">
+      <%= (@stats[:emails_opened].to_f / @stats[:emails_sent] * 100).round(1) %>%
+    </div>
+  </div>
+  <% end %>
+</div>
+
+<!-- Storm list -->
+<div class="section-header">
+  <h2>Recent Storms</h2>
+</div>
+
+<% if @storms.empty? %>
+  <div class="table-wrap">
+    <div class="empty">No storms detected yet. Pipeline runs every 15 minutes via NOAA SPC.</div>
+  </div>
+<% else %>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Storm</th>
+          <th>Date</th>
+          <th>State</th>
+          <th>Hail</th>
+          <th>Counties</th>
+          <th>Properties</th>
+          <th>Contacts</th>
+          <th>Sent</th>
+          <th>Opened</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @storms.each do |storm| %>
+          <% sent    = storm.properties.joins(:email_outreaches).count %>
+          <% opened  = EmailCampaign.joins(email_outreach: { property: :storm_event })
+                         .where(storm_events: { id: storm.id }).where.not(opened_at: nil).count rescue 0 %>
+          <tr>
+            <td><strong><%= storm.metro_area %></strong></td>
+            <td><%= storm.event_date.strftime('%b %-d, %Y') %></td>
+            <td><%= storm.state %></td>
+            <td>
+              <span class="badge <%= storm.hail_size >= 2.0 ? 'badge-red' : storm.hail_size >= 1.75 ? 'badge-amber' : 'badge-blue' %>">
+                <%= storm.hail_size %>"
+              </span>
+            </td>
+            <td>
+              <div class="tag-list">
+                <% storm.counties.split(',').first(3).each do |c| %>
+                  <span class="tag"><%= c.strip %></span>
+                <% end %>
+                <% extra = storm.counties.split(',').size - 3 %>
+                <% if extra > 0 %><span class="tag">+<%= extra %></span><% end %>
+              </div>
+            </td>
+            <td><%= storm.properties.count %></td>
+            <td><%= storm.contacts.count %></td>
+            <td><%= sent %></td>
+            <td>
+              <% if sent > 0 %>
+                <%= (opened.to_f / sent * 100).round %>%
+              <% else %>
+                —
+              <% end %>
+            </td>
+            <td>
+              <% badge_class = case storm.status
+                               when 'complete'   then 'badge-green'
+                               when 'processing' then 'badge-amber'
+                               when 'error'      then 'badge-red'
+                               else                   'badge-slate'
+                               end %>
+              <span class="badge <%= badge_class %>"><%= storm.status %></span>
+            </td>
+            <td><%= link_to 'View →', pipeline_path(storm) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

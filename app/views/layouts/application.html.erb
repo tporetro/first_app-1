@@ -1,14 +1,112 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>FirstApp</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Storm Lead Pipeline — Powered by Claude Code</title>
   <%= stylesheet_link_tag    "application", media: "all", "data-turbolinks-track" => true %>
   <%= javascript_include_tag "application", "data-turbolinks-track" => true %>
   <%= csrf_meta_tags %>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           background: #0f1117; color: #e2e8f0; font-size: 14px; line-height: 1.5; }
+    a { color: #60a5fa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Nav */
+    nav { background: #1a1d27; border-bottom: 1px solid #2d3148; padding: 0 24px;
+          display: flex; align-items: center; gap: 24px; height: 52px; }
+    nav .brand { font-weight: 700; font-size: 15px; color: #f1f5f9; letter-spacing: -.3px; }
+    nav .brand span { color: #60a5fa; }
+    nav a { color: #94a3b8; font-size: 13px; }
+    nav a:hover { color: #e2e8f0; text-decoration: none; }
+    nav .spacer { flex: 1; }
+    nav .trigger-btn { background: #2563eb; color: #fff; border: none; border-radius: 6px;
+                       padding: 6px 14px; font-size: 13px; cursor: pointer; }
+    nav .trigger-btn:hover { background: #1d4ed8; }
+
+    /* Layout */
+    .container { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+    h1 { font-size: 20px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; }
+    h2 { font-size: 16px; font-weight: 600; color: #f1f5f9; margin-bottom: 14px; }
+    .subtitle { color: #64748b; font-size: 13px; margin-bottom: 28px; }
+
+    /* Stat cards */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                  gap: 14px; margin-bottom: 32px; }
+    .stat-card { background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px;
+                 padding: 16px 18px; }
+    .stat-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
+                        color: #64748b; margin-bottom: 6px; }
+    .stat-card .value { font-size: 26px; font-weight: 700; color: #f1f5f9; }
+    .stat-card .value.blue  { color: #60a5fa; }
+    .stat-card .value.green { color: #34d399; }
+    .stat-card .value.amber { color: #fbbf24; }
+
+    /* Tables */
+    .table-wrap { background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px;
+                  overflow: hidden; margin-bottom: 32px; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: #12151f; color: #64748b; font-size: 11px; text-transform: uppercase;
+               letter-spacing: .6px; padding: 10px 16px; text-align: left; border-bottom: 1px solid #2d3148; }
+    tbody tr { border-bottom: 1px solid #1e2235; transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #1e2235; }
+    tbody td { padding: 11px 16px; vertical-align: middle; }
+
+    /* Badges */
+    .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
+             border-radius: 4px; text-transform: uppercase; letter-spacing: .4px; }
+    .badge-blue   { background: #1e3a5f; color: #60a5fa; }
+    .badge-green  { background: #064e3b; color: #34d399; }
+    .badge-amber  { background: #451a03; color: #fbbf24; }
+    .badge-red    { background: #450a0a; color: #f87171; }
+    .badge-slate  { background: #1e2435; color: #94a3b8; }
+
+    /* Variant bar */
+    .variant-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
+    .variant-card { background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px;
+                    padding: 14px 16px; }
+    .variant-card .v-label { font-size: 12px; color: #64748b; margin-bottom: 2px; }
+    .variant-card .v-score { font-size: 22px; font-weight: 700; color: #f1f5f9; }
+    .variant-card .v-bar   { height: 4px; background: #2d3148; border-radius: 2px; margin: 8px 0 4px; }
+    .variant-card .v-fill  { height: 4px; background: #2563eb; border-radius: 2px; }
+    .variant-card .v-meta  { font-size: 11px; color: #64748b; }
+
+    /* Section header row */
+    .section-header { display: flex; align-items: center; justify-content: space-between;
+                      margin-bottom: 14px; }
+    .section-header a { font-size: 12px; color: #60a5fa; }
+
+    /* Misc */
+    .empty { padding: 32px; text-align: center; color: #475569; font-size: 13px; }
+    .tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
+    .tag { background: #1e2435; color: #94a3b8; font-size: 11px; padding: 2px 7px;
+           border-radius: 4px; }
+    .monospace { font-family: "SF Mono", "Fira Code", monospace; font-size: 12px; }
+    .flash-notice { background: #064e3b; color: #34d399; border: 1px solid #065f46;
+                    padding: 10px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; }
+    .back-link { font-size: 13px; color: #60a5fa; display: inline-block; margin-bottom: 20px; }
+  </style>
 </head>
 <body>
 
-<%= yield %>
+<nav>
+  <span class="brand">Claw<span>bot</span></span>
+  <%= link_to 'Storms', pipeline_index_path %>
+  <div class="spacer"></div>
+  <%= button_to 'Run Pipeline Now', trigger_pipeline_index_path,
+        method: :post, class: 'trigger-btn',
+        data: { confirm: 'Trigger a full pipeline run now?' } %>
+</nav>
+
+<div class="container">
+  <% if notice %>
+    <div class="flash-notice"><%= notice %></div>
+  <% end %>
+  <%= yield %>
+</div>
 
 </body>
 </html>

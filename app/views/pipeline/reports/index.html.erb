@@ -1,0 +1,84 @@
+<%= link_to "← #{@storm.metro_area} #{@storm.event_date.strftime('%b %-d, %Y')}", pipeline_path(@storm), class: 'back-link' %>
+
+<h1>Gamma Reports — <%= @storm.metro_area %></h1>
+<p class="subtitle"><%= @reports.count %> reports generated &nbsp;·&nbsp; <%= @storm.event_date.strftime('%B %-d, %Y') %></p>
+
+<% if @reports.empty? %>
+  <div class="table-wrap">
+    <div class="empty">No reports generated yet. Phase 4 (Gamma) runs after contact enrichment.</div>
+  </div>
+<% else %>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Address</th>
+          <th>Owner</th>
+          <th>Type</th>
+          <th>Sq Ft</th>
+          <th>Report</th>
+          <th>Email Status</th>
+          <th>Follow-ups</th>
+          <th>Opened</th>
+          <th>Clicked</th>
+          <th>Replied</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @reports.each do |prop| %>
+          <% report    = prop.gamma_report %>
+          <% outreaches = prop.email_outreaches.sort_by(&:created_at) %>
+          <% initial   = outreaches.find { |o| o.followup_day == 0 } %>
+          <% campaign  = initial&.email_campaign %>
+          <% followups = outreaches.select { |o| o.followup_day > 0 } %>
+          <tr>
+            <td class="monospace"><%= prop.address %></td>
+            <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              <%= prop.owner_entity || '—' %>
+            </td>
+            <td><span class="badge badge-slate"><%= prop.property_type || '—' %></span></td>
+            <td><%= prop.sq_ft ? number_with_delimiter(prop.sq_ft) : '—' %></td>
+            <td>
+              <% if report %>
+                <%= link_to '📊 Open Report', report.gamma_url, target: '_blank' %>
+              <% else %>
+                <span style="color:#475569">—</span>
+              <% end %>
+            </td>
+            <td>
+              <% if campaign %>
+                <% status = campaign.replied_at ? 'replied' : campaign.clicked_at ? 'clicked' :
+                            campaign.opened_at  ? 'opened'  : campaign.delivered_at ? 'delivered' : 'sent' %>
+                <% badge  = { 'replied' => 'badge-amber', 'clicked' => 'badge-green',
+                              'opened'  => 'badge-green', 'delivered' => 'badge-blue',
+                              'sent'    => 'badge-slate' }[status] %>
+                <span class="badge <%= badge %>"><%= status %></span>
+              <% elsif initial&.status == 'failed' %>
+                <span class="badge badge-red">failed</span>
+              <% else %>
+                <span style="color:#475569">—</span>
+              <% end %>
+            </td>
+            <td style="color:#94a3b8"><%= followups.size > 0 ? "#{followups.size} sent" : '—' %></td>
+            <td>
+              <% if campaign&.opened_at %>
+                <span style="color:#34d399">✓</span>
+                <span style="font-size:11px;color:#64748b"><%= campaign.opened_at.strftime('%-m/%-d %H:%M') %></span>
+              <% else %>—<% end %>
+            </td>
+            <td>
+              <% if campaign&.clicked_at %>
+                <span style="color:#34d399">✓</span>
+              <% else %>—<% end %>
+            </td>
+            <td>
+              <% if campaign&.replied_at %>
+                <span style="color:#fbbf24;font-weight:600">★ YES</span>
+              <% else %>—<% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
