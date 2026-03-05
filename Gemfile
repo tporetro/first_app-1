@@ -1,7 +1,8 @@
 source 'https://rubygems.org'
 
-# Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
-gem 'rails', '4.0.0.beta1'
+ruby '3.3.6'
+
+gem 'rails', '~> 7.1'
 
 # --- Storm Lead Pipeline dependencies ---
 
@@ -14,7 +15,7 @@ gem 'smarter_csv'
 # ZIP file extraction (Phase 2 CAD bulk download unpacking)
 gem 'rubyzip'
 
-# HTTP (used by service objects — stdlib Net::HTTP is fine but this is cleaner)
+# HTTP (used by service objects)
 gem 'httparty'
 
 # Background job processing (pipeline phases run as jobs)
@@ -24,26 +25,26 @@ gem 'sidekiq'
 gem 'sidekiq-cron'
 
 # In-memory cache for variant optimizer Thompson Sampling state
-# (Redis in production via REDIS_URL, memory store in dev)
 gem 'redis'
-gem 'redis-store'
-gem 'redis-rails'
+
+# Asset pipeline
+gem 'sprockets-rails'
+gem 'sass-rails'
+gem 'uglifier'
+
+gem 'jquery-rails'
+gem 'turbolinks', '~> 5'
+gem 'jbuilder'
 
 group :development do
-  gem 'sqlite3', '1.3.7'
-  gem 'dotenv-rails'  # load .env for ANTHROPIC_API_KEY, CLAY_API_KEY, etc.
+  gem 'sqlite3', '~> 1.6'
+  gem 'dotenv-rails'
 end
-
-group :assets do
-  gem 'sass-rails',   '4.0.0.beta1'
-  gem 'coffee-rails', '4.0.0.beta1'
-  gem 'uglifier', '1.0.3'
-end
-
-gem 'jquery-rails', '2.2.1'
-gem 'turbolinks', '1.0.0'
-gem 'jbuilder', '1.0.1'
 
 group :production do
-  gem 'pg', '0.12.2'
+  gem 'pg'
+end
+
+group :development, :test do
+  gem 'debug'
 end

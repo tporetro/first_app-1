@@ -9,4 +9,4 @@
 
 # Make sure your secret_key_base is kept private
 # if you're sharing your code publicly.
-FirstApp::Application.config.secret_key_base = 'bf579bdfecb74d8c6e6698e4c9a97539186b5211a164ed5fa80d903bbfc17097ba843a85ee6c7ce5b40994430f98252cd1011f68052c1059ec2fe2330ed1ee17'
+Rails.application.config.secret_key_base = ENV.fetch('SECRET_KEY_BASE', 'bf579bdfecb74d8c6e6698e4c9a97539186b5211a164ed5fa80d903bbfc17097ba843a85ee6c7ce5b40994430f98252cd1011f68052c1059ec2fe2330ed1ee17')
