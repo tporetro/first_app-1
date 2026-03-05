@@ -15,13 +15,50 @@ class ReportTemplateService
 
   # ── Team credentials — update as team grows ──────────────────────────────
   TEAM = {
-    name:    'Michael Johnson',
-    title:   'Director of Commercial Services',
-    phone:   '(512) 621-4201',
-    email:   'michael@restorationgc.net',
-    amy:     'amy@restorationgc.net',
-    company: 'Restoration GC'
+    name:             'Michael Johnson',
+    title:            'Director of Commercial Services',
+    phone:            '(512) 621-4201',
+    email:            'michael@restorationgc.net',
+    amy:              'amy@restorationgc.net',
+    company:          'Restoration GC',
+    years_experience: 22
   }.freeze
+
+  # ── Legal partner — Commercial Policyholder Attorneys ────────────────────
+  LEGAL_PARTNER = {
+    name:          'The Voss Law Firm, P.C.',
+    tagline:       'Commercial Policyholder Attorneys',
+    phone:         '866-276-6179',
+    web:           'www.DeniedClaim.com',
+    fee:           'No fee if no recovery on all cases',
+    avg_return:    '780%',   # published: "Recover Up to 780% More on Your Insurance Claim"
+    availability:  '24 hours a day, 7 days a week, 365 days a year',
+    claim_types:   %w[Industrial Marine Condominium Commercial Agricultural Governmental Church Residential],
+    services: [
+      'Review your policy coverage',
+      'Assess the extent of the loss',
+      'Assign a Claim Support Analyst to your claim',
+      'Document and present your claim',
+      'Bring adjusters, accountants, engineers, contractors, and photographers',
+      'Use state-of-the-art software to analyze the loss',
+      'Negotiate your settlement',
+      'Ensure deadlines are not missed',
+      'Coordinate with your mortgage company for timely fund release'
+    ]
+  }.freeze
+
+  # ── Voss Law "First Offer vs. Settlement" results (from published document)
+  VOSS_RESULTS = [
+    { type: 'Industrial Commercial Property', offer: '$75,000',  recovery: '$5,400,000' },
+    { type: 'National Chain Hotel',           offer: '$50,000',  recovery: '$3,000,000' },
+    { type: 'Apartment Complex',              offer: '$25,000',  recovery: '$800,000'   },
+    { type: 'Dental Facilities',              offer: '$25,000',  recovery: '$800,000'   },
+    { type: 'Air Conditioning Company',       offer: '$0',       recovery: '$1,500,000' },
+    { type: 'Local Houston Hotel',            offer: '$50,000',  recovery: '$1,400,000' },
+    { type: 'Apartment Complex',              offer: '$0',       recovery: '$750,000'   },
+    { type: 'Apartment Complex',              offer: '$0',       recovery: '$425,000'   },
+    { type: 'Shopping Center',                offer: '$0',       recovery: '$400,000'   }
+  ].freeze
 
   # ── Claims filing window (months from storm date) ─────────────────────────
   CLAIM_WINDOW_MONTHS = 12
@@ -158,18 +195,28 @@ class ReportTemplateService
 
       ## The Win-in-Advance™ Approach
 
+      **#{TEAM[:name]}** has spent **#{TEAM[:years_experience]} years** protecting commercial
+      policyholders alongside **#{LEGAL_PARTNER[:name]}** — #{LEGAL_PARTNER[:tagline]}.
+
+      Together, the team has documented recoveries averaging **up to #{LEGAL_PARTNER[:avg_return]}
+      more than the carrier's initial offer** — a Voss Law published figure.
+
       #{TEAM[:company]}'s process is built around one principle: **present a claim so completely
       that the carrier's only rational response is full payment.**
 
-      Our integrated team handles every stage:
-
       | Stage | What We Do |
       |---|---|
-      | **Forensic Inspection** | Licensed engineers conduct a roof-level assessment, document all damage, and correlate findings to storm weather data |
-      | **Engineering Report** | A stamped engineering report establishes causation — hail caused this damage — eliminating the carrier's primary denial argument |
-      | **Public Adjuster Management** | Our licensed PAs prepare and present the claim in the carrier's own language, maximizing scope and value |
-      | **Legal Support** | If the carrier disputes, our insurance attorneys apply the legal pressure that changes the outcome — at no additional cost until recovery |
-      | **Restoration** | Once the claim is approved, our licensed GC team executes the project from permit to warranty |
+      | **Forensic Inspection** | Licensed engineers document all damage and correlate findings to storm weather data |
+      | **Engineering Report** | Stamped causation report eliminates the carrier's primary denial argument |
+      | **Public Adjuster Management** | Licensed PAs prepare and present the claim in the carrier's own language |
+      | **Legal Representation** | #{LEGAL_PARTNER[:name]} — #{LEGAL_PARTNER[:fee]} — applies the legal pressure that changes outcomes |
+      | **Restoration** | Licensed GC team executes the project from permit to warranty |
+
+      When carriers push back, Voss Law's published track record includes:
+
+      | Property Type | Carrier's Offer | Settlement |
+      |---|---|---|
+      #{VOSS_RESULTS.first(4).map { |r| "| #{r[:type]} | #{r[:offer]} | **#{r[:recovery]}** |" }.join("\n      ")}
 
       **You pay nothing out of pocket until your claim is approved and funded.**
 
@@ -321,15 +368,28 @@ class ReportTemplateService
 
       ---
 
-      ## Our Team
+      ## About the Team
 
-      Unlike a standard roofing contractor, #{TEAM[:company]} brings an integrated recovery
-      team to every large-loss claim:
+      **#{TEAM[:name]}** has spent **#{TEAM[:years_experience]} years** protecting commercial
+      policyholders alongside **#{LEGAL_PARTNER[:name]}** — #{LEGAL_PARTNER[:tagline]}.
 
-      - **Licensed Engineers** — structural and forensic analysis, stamped reports, causation documentation
+      Voss Law publishes this benchmark: clients recover **up to #{LEGAL_PARTNER[:avg_return]}
+      more** than what the carrier offered before retaining legal representation.
+
+      #{TEAM[:company]} brings a complete recovery team to every large-loss claim:
+
+      - **Licensed Engineers** — forensic analysis, stamped causation reports
       - **Certified Public Adjusters** — licensed claim preparation and carrier negotiation
-      - **Insurance Attorneys** — legal representation when carriers dispute or delay
+      - **#{LEGAL_PARTNER[:name]}** — legal representation when carriers dispute or delay; #{LEGAL_PARTNER[:fee]}
       - **General Contractor** — licensed restoration execution from permit to warranty
+
+      Voss Law's published "First Offer vs. Settlement Actuals":
+
+      | Property Type | Carrier's Offer | Settlement |
+      |---|---|---|
+      #{VOSS_RESULTS.first(5).map { |r| "| #{r[:type]} | #{r[:offer]} | **#{r[:recovery]}** |" }.join("\n      ")}
+
+      *Full results: #{LEGAL_PARTNER[:web]} | #{LEGAL_PARTNER[:phone]}*
 
       **You pay nothing out of pocket until your claim is approved and funded.**
 

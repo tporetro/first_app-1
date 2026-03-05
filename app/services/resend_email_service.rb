@@ -67,14 +67,21 @@ class ResendEmailService
     { success: false, error: e.message }
   end
 
-  # Variant subject lines for A/B/C/D/E/F testing
+  SENDER_YEARS       = 22
+  SENDER_AVG_RETURN  = '780%'
+
+  LEGAL_PARTNER_NAME = 'The Voss Law Firm, P.C.'.freeze
+  LEGAL_PARTNER_WEB  = 'www.DeniedClaim.com'.freeze
+
+  # Variant subject lines for A/B/C/D/E/F/G testing
   SUBJECT_VARIANTS = {
     'a' => 'Confidential: Storm Damage Intelligence Report — %<address>s',
     'b' => 'Urgent: Hidden Hail Damage Risk at %<address>s',
     'c' => 'Forensic Assessment Ready — %<address>s [%<date>s Storm]',
     'd' => '%<owner>s — Your %<address>s Property Was in the Hail Swath',
     'e' => '%<owner>s — The Garden Ridge Founder Was Skeptical Too',
-    'f' => '%<owner>s — The State of Texas Had the Same Roof Problem'
+    'f' => '%<owner>s — The State of Texas Had the Same Roof Problem',
+    'g' => '%<owner>s — Carrier Said $0. We Got Them $5.4 Million.'
   }.freeze
 
   # Verified client case studies — signed reference letters on file
@@ -121,6 +128,7 @@ class ResendEmailService
     case variant.to_s
     when 'e' then build_html_garden_ridge(lead, report_url)
     when 'f' then build_html_region_13(lead, report_url)
+    when 'g' then build_html_voss_denied(lead, report_url)
     else          build_html_standard(lead, report_url)
     end
   end
@@ -216,6 +224,59 @@ class ResendEmailService
           #{SENDER_TITLE}<br>
           #{SENDER_COMPANY}<br>
           #{SENDER_PHONE}
+        </p>
+      </div>
+    HTML
+  end
+
+  # Variant G — Voss Law "denied claim" angle (any commercial target where denial is the fear)
+  # Uses the $5.4M Industrial Property case as the hook — $75K offer → $5.4M recovery
+  def self.build_html_voss_denied(lead, report_url)
+    first_name = lead[:human_owner_name]&.split&.first || 'there'
+    address    = lead[:address]
+
+    <<~HTML
+      <div style="font-family: Arial, sans-serif; max-width: 640px; margin: auto; color: #222; line-height: 1.6;">
+        <p>Hi #{first_name},</p>
+
+        <p>An industrial property owner in Texas received a check from his insurance carrier.
+        <strong>$75,000.</strong> The carrier called it settled.</p>
+
+        <p>He wasn't sure it was right, so he called us. We brought in The Voss Law Firm —
+        Commercial Policyholder Attorneys. The actual settlement: <strong>$5,400,000.</strong></p>
+
+        <p>The carrier had offered him 1.4 cents on the dollar.</p>
+
+        <p>I'm reaching out because <strong>#{address}</strong> was in the path of a documented
+        hail event — and in #{SENDER_YEARS} years of large-loss commercial work, I've learned
+        that what the carrier offers first and what a property is actually worth are rarely
+        the same number. Voss Law publishes data showing clients recover up to
+        <strong>#{SENDER_AVG_RETURN} more</strong> than the carrier's initial offer once
+        legal representation is in place.</p>
+
+        <p>We've prepared a confidential damage intelligence report for your property.
+        There is no cost and no obligation:</p>
+
+        <p style="text-align:center; margin: 32px 0;">
+          <a href="#{report_url}"
+             style="background-color:#c0392b; color:white; padding:14px 28px;
+                    text-decoration:none; border-radius:4px; font-weight:bold; font-size:16px;">
+            View Your Confidential Property Report &rarr;
+          </a>
+        </p>
+
+        <p>Amy on my team will reach out within 24 hours to schedule a brief call at your convenience.</p>
+
+        <p>Best regards,</p>
+        <p>
+          <strong>#{SENDER_NAME}</strong><br>
+          #{SENDER_TITLE}<br>
+          #{SENDER_COMPANY}<br>
+          #{SENDER_PHONE}
+        </p>
+        <p style="font-size:12px; color:#666;">
+          Working alongside #{LEGAL_PARTNER_NAME} — Commercial Policyholder Attorneys.
+          No fee if no recovery. #{LEGAL_PARTNER_WEB}
         </p>
       </div>
     HTML
