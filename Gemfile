@@ -35,6 +35,7 @@ gem 'uglifier'
 gem 'jquery-rails'
 gem 'turbolinks', '~> 5'
 gem 'jbuilder'
+gem 'puma', '~> 6.0'
 
 group :development do
   gem 'sqlite3', '~> 1.6'
