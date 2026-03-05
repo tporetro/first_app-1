@@ -8,7 +8,7 @@ FirstApp::Application.configure do
   config.public_file_server.enabled = ENV['RAILS_SERVE_STATIC_FILES'].present?
 
   # Compress JavaScripts and CSS.
-  config.assets.js_compressor  = Uglifier.new(harmony: true)
+  config.assets.js_compressor  = nil  # Uglifier/MiniRacer incompatible; CDN handles compression
   config.assets.compile = false
   config.assets.digest = true
   config.assets.version = '1.0'

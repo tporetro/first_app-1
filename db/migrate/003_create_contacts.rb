@@ -17,8 +17,8 @@ class CreateContacts < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :contacts, :storm_event_id
-    add_index :contacts, :owner_entity
-    add_index :contacts, :owner_email
+    add_index :contacts, :storm_event_id unless index_exists?(:contacts, :storm_event_id)
+    add_index :contacts, :owner_entity unless index_exists?(:contacts, :owner_entity)
+    add_index :contacts, :owner_email unless index_exists?(:contacts, :owner_email)
   end
 end
