@@ -1,5 +1,5 @@
 # Lightweight status dashboard — read-only views into the pipeline.
-# No authentication layer here; add Devise or HTTP Basic if exposing externally.
+# Authentication handled by ApplicationController (HTTP Basic Auth).
 class PipelineController < ApplicationController
   def index
     @storms = StormEvent.recent.limit(20)
@@ -21,9 +21,12 @@ class PipelineController < ApplicationController
     @variants   = VariantOptimizerService.performance_summary(storm_event_id: @storm.id)
   end
 
-  # POST /pipeline/trigger — manual pipeline run (for testing without cron)
+  # POST /pipeline/trigger — enqueues a background job rather than running inline.
+  # Running StormPipelineService.run synchronously in a request would timeout
+  # (pipeline takes 20-40 minutes end-to-end).
   def trigger
-    StormPipelineService.run
-    redirect_to pipeline_index_path, notice: 'Pipeline triggered. Check logs.'
+    StormMonitorJob.perform_async
+    redirect_to pipeline_index_path,
+      notice: 'Pipeline job enqueued. Storms will appear here as they are detected and processed.'
   end
 end

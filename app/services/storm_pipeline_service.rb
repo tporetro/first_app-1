@@ -28,8 +28,13 @@ class StormPipelineService
     end
 
     storms.each do |storm_data|
-      storm = persist_storm(storm_data)
+      storm, newly_created = persist_storm(storm_data)
       next unless storm
+
+      unless newly_created
+        log "Storm already processed: #{storm.name} (id=#{storm.id}) — skipping"
+        next
+      end
 
       PushoverService.notify(
         title: '⛈️ Storm Detected',
@@ -431,9 +436,25 @@ class StormPipelineService
     end
   end
 
+  # Returns [storm, newly_created] so callers can skip re-processing existing storms.
+  # Uniqueness key: event_date + state + metro_area.
+  # The 15-min cron runs constantly — without this, the same storm triggers
+  # duplicate outreach to every owner on every monitor cycle.
   def self.persist_storm(storm_data)
-    StormEvent.create!(
-      name:       "#{storm_data[:location]} #{storm_data[:date]}",
+    name = "#{storm_data[:location]} #{storm_data[:date]}"
+
+    storm = StormEvent.find_by(
+      event_date: storm_data[:date],
+      state:      storm_data[:state],
+      metro_area: storm_data[:location]
+    )
+
+    if storm
+      return [storm, false]
+    end
+
+    storm = StormEvent.create!(
+      name:       name,
       event_date: storm_data[:date],
       hail_size:  storm_data[:hail_size],
       counties:   storm_data[:counties].join(', '),
@@ -441,9 +462,10 @@ class StormPipelineService
       metro_area: storm_data[:location],
       status:     'detected'
     )
+    [storm, true]
   rescue ActiveRecord::RecordInvalid => e
     Rails.logger.error "Failed to persist storm: #{e.message}"
-    nil
+    [nil, false]
   end
 
   # Build lead data for multi-property portfolio outreach
