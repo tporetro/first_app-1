@@ -52,7 +52,7 @@ services:
   - type: worker
     name: storm-pipeline-worker
     runtime: ruby
-    plan: free
+    plan: starter
     buildCommand: |
       gem install bundler -v '~> 2.7'
       bundle install
