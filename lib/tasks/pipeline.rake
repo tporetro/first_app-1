@@ -99,6 +99,52 @@ namespace :pipeline do
   end
 
   # ---------------------------------------------------------------------------
+  # Manually seed a known storm event (bypass NOAA — use when storm is confirmed
+  # in the field before API data is available).
+  # Usage: rake pipeline:seed_storm[1.5,"Dallas",TX,"Dallas,Collin,Denton",2026-03-05]
+  # Counties: comma-separated, no spaces around commas
+  # ---------------------------------------------------------------------------
+  desc 'Seed a manually confirmed storm event (rake pipeline:seed_storm[hail_size,metro,state,counties,date])'
+  task :seed_storm, [:hail_size, :metro, :state, :counties, :date] => :environment do |_, args|
+    hail_size = args[:hail_size].to_f
+    metro     = args[:metro]
+    state     = args[:state]
+    counties  = args[:counties]
+    date      = args[:date] ? Date.parse(args[:date]) : Date.today
+
+    if hail_size < 1.5
+      puts "ERROR: Hail size #{hail_size}\" is below the 1.5\" qualifying threshold. Aborting."
+      next
+    end
+
+    name = "#{metro} #{date.strftime('%Y-%m-%d')}"
+
+    if StormEvent.exists?(name: name)
+      storm = StormEvent.find_by(name: name)
+      puts "Storm already exists: #{storm.name} (id=#{storm.id})"
+    else
+      storm = StormEvent.create!(
+        name:       name,
+        event_date: date,
+        hail_size:  hail_size,
+        counties:   counties,
+        state:      state,
+        metro_area: metro,
+        status:     'detected',
+        notes:      "Manually seeded — field confirmation #{Time.now.strftime('%Y-%m-%d %H:%M')} CST"
+      )
+      puts "Storm created: #{storm.name} (id=#{storm.id})"
+    end
+
+    puts ""
+    puts "Next steps:"
+    puts "  1. Export commercial properties in the hail swath from maps-of-meaning / county CAD"
+    puts "  2. rake pipeline:import_properties[#{storm.id},/path/to/properties.csv]"
+    puts "  3. rake pipeline:enrich[#{storm.id}]"
+    puts "  4. (pipeline:monitor will generate reports and send outreach on next cron run)"
+  end
+
+  # ---------------------------------------------------------------------------
   # Variant performance report
   # ---------------------------------------------------------------------------
   desc 'Print A/B/C/D variant performance for a storm (rake pipeline:variants[storm_id])'
