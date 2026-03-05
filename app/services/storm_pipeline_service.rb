@@ -42,10 +42,12 @@ class StormPipelineService
       contacts   = phase_3_enrich_contacts(storm, properties)
       log "Phase 3: #{contacts.size} contacts enriched"
 
-      reports    = phase_4_generate_reports(storm, properties)
-      log "Phase 4: #{reports.size} Gamma reports generated"
+      report_data = phase_4_generate_reports(storm, properties, contacts)
+      prop_count  = report_data[:property_reports].size
+      port_count  = report_data[:portfolio_reports].size
+      log "Phase 4: #{prop_count} property reports + #{port_count} portfolio overviews generated"
 
-      sent       = phase_5_send_outreach(properties, contacts, reports)
+      sent       = phase_5_send_outreach(properties, contacts, report_data)
       log "Phase 5: #{sent} outreach emails sent"
 
       storm.update!(status: 'complete')
@@ -144,67 +146,126 @@ class StormPipelineService
     contacts
   end
 
-  def self.phase_4_generate_reports(storm, properties)
-    reports = []
-    # 2-second delay between Gamma API submissions (rate limit)
+  # Phase 4: Generate reports in correct order:
+  #   1. Individual property reports (need their URLs first)
+  #   2. Portfolio overview (embeds individual report URLs, for multi-property owners)
+  #
+  # Returns: { property_reports: [...GammaReport], portfolio_reports: { owner_entity => GammaReport } }
+  def self.phase_4_generate_reports(storm, properties, contacts)
+    property_reports  = []
+    portfolio_reports = {}  # owner_entity => GammaReport (portfolio overview)
+
+    # Step 4a: Individual property technical reports
     properties.each_with_index do |property, idx|
       sleep 2 if idx > 0
 
-      markdown = ReportTemplateService.render(storm: storm, property: property)
+      markdown  = ReportTemplateService.render_property(storm: storm, property: property)
       gamma_url = GammaReportService.generate(markdown_content: markdown)
       next unless gamma_url
 
       report = GammaReport.create!(
-        property: property,
-        report_id: "#{storm.id}-#{property.id}",
-        gamma_url: gamma_url,
-        status: 'completed',
+        property:   property,
+        report_id:  "prop-#{storm.id}-#{property.id}",
+        gamma_url:  gamma_url,
+        status:     'completed',
         credits_used: 400
       )
-      reports << report
+      property_reports << report
     end
-    reports
+
+    # Step 4b: Portfolio overview for owners with 2+ properties
+    # Groups properties by owner_entity, generates one portfolio deck per owner
+    by_owner = properties.group_by(&:owner_entity)
+    by_owner.each do |entity, owner_properties|
+      next if owner_properties.size < 2  # single-property owners get just the property report
+
+      sleep 2
+
+      contact = contacts.find { |c| c.owner_entity == entity }
+      property_report_urls = owner_properties.each_with_object({}) do |p, h|
+        report = property_reports.find { |r| r.property_id == p.id }
+        h[p.id] = report.gamma_url if report
+      end
+
+      markdown = ReportTemplateService.render_portfolio(
+        storm:               storm,
+        properties:          owner_properties,
+        owner_entity:        entity,
+        contact:             contact,
+        property_report_urls: property_report_urls
+      )
+
+      gamma_url = GammaReportService.generate(markdown_content: markdown)
+      next unless gamma_url
+
+      # Use first property as anchor for the portfolio report record
+      anchor_property = owner_properties.first
+      portfolio_report = GammaReport.create!(
+        property:   anchor_property,
+        report_id:  "portfolio-#{storm.id}-#{entity.parameterize}",
+        gamma_url:  gamma_url,
+        status:     'completed',
+        credits_used: 400
+      )
+      portfolio_reports[entity] = portfolio_report
+
+      log "Portfolio overview generated for #{entity} (#{owner_properties.size} properties)"
+    end
+
+    { property_reports: property_reports, portfolio_reports: portfolio_reports }
   end
 
-  def self.phase_5_send_outreach(properties, contacts, reports)
+  def self.phase_5_send_outreach(properties, contacts, report_data)
+    property_reports  = report_data[:property_reports]
+    portfolio_reports = report_data[:portfolio_reports]
     sent = 0
-    properties.each do |property|
-      contact = contacts.find { |c| c.owner_entity == property.owner_entity }
-      report  = reports.find  { |r| r.property_id == property.id }
-      next unless contact && report
-      next if contact.owner_email.blank?  # flag for LinkedIn/phone manual outreach
 
-      lead_data = build_lead_data(property, contact)
+    # Group properties by owner — one email per owner (covers all their properties)
+    by_owner = properties.group_by(&:owner_entity)
 
-      # Thompson Sampling selects the best variant given current performance data
-      variant = VariantOptimizerService.assign(storm_event_id: property.storm_event_id)
+    by_owner.each do |entity, owner_properties|
+      contact = contacts.find { |c| c.owner_entity == entity }
+      next unless contact
+      next if contact.owner_email.blank?
 
-      # Research the prospect so Claude can write something genuinely personal
-      research = ProspectResearchService.research(lead: lead_data)
+      # Determine which report to link in the email:
+      # Multi-property → portfolio overview; single → property report
+      primary_report = if portfolio_reports[entity]
+                         portfolio_reports[entity]
+                       else
+                         property_reports.find { |r| r.property_id == owner_properties.first.id }
+                       end
+      next unless primary_report
+
+      lead_data = build_portfolio_lead_data(storm: owner_properties.first.storm_event,
+                                             properties: owner_properties,
+                                             contact: contact)
+
+      variant = VariantOptimizerService.assign(storm_event_id: owner_properties.first.storm_event_id)
+
+      # Claude researches the owner and writes a genuinely personalized email
+      research     = ProspectResearchService.research(lead: lead_data)
       enriched_lead = lead_data.merge(research: research)
 
-      # Claude writes the email — no templates, actual reasoning about this person
       composed = AiEmailComposerService.compose(
         lead:       enriched_lead,
-        report_url: report.gamma_url,
+        report_url: primary_report.gamma_url,
         variant:    variant
       )
 
-      # Send via Resend
-      send_result = ResendEmailService.send_outreach(
-        to:         contact.owner_email,
-        lead:       enriched_lead.merge(composed.slice(:subject)),
-        report_url: report.gamma_url,
-        variant:    variant
+      send_result = ResendEmailService.send_composed(
+        to:      contact.owner_email,
+        subject: composed[:subject],
+        body_html: composed[:body_html] || nil,
+        body_text: composed[:body]
       )
 
-      # Override with AI-generated body by sending via Resend directly with composed content
-      # (ResendEmailService.send_outreach handles the actual HTTP POST)
-
+      # Record one outreach per owner (anchor to first property)
+      anchor = owner_properties.first
       outreach = EmailOutreach.create!(
-        property:      property,
+        property:      anchor,
         contact:       contact,
-        gamma_report:  report,
+        gamma_report:  primary_report,
         subject:       composed[:subject],
         body:          composed[:body],
         sent_to_email: contact.owner_email,
@@ -216,14 +277,18 @@ class StormPipelineService
 
       if send_result[:success]
         EmailCampaign.create!(
-          email_outreach:    outreach,
+          email_outreach:     outreach,
           mailgun_message_id: send_result[:message_id],
-          owner_name:        contact.human_owner_name,
-          address:           property.address,
-          variant:           variant,
-          status:            'sent'
+          owner_name:         contact.human_owner_name,
+          address:            anchor.address,
+          variant:            variant,
+          status:             'sent'
         )
         sent += 1
+        PushoverService.notify(
+          title: 'Email Sent',
+          message: "#{contact.human_owner_name} — #{owner_properties.size} #{owner_properties.size == 1 ? 'property' : 'properties'}, #{lead_data[:total_recovery]}"
+        )
       end
     end
     sent
@@ -292,9 +357,37 @@ class StormPipelineService
     }
   end
 
-  # Distribute properties across A/B/C/D variants for subject line testing
-  def self.assign_variant(property_id)
-    %w[a b c d][property_id % 4]
+  # Build lead data for multi-property portfolio outreach
+  def self.build_portfolio_lead_data(storm:, properties:, contact:)
+    total_recovery = properties.sum { |p| ((p.sq_ft || 0) * ReportTemplateService::COST_PER_SQFT).to_i }
+    deadline = (storm.event_date >> ReportTemplateService::CLAIM_WINDOW_MONTHS).strftime('%B %-d, %Y')
+    {
+      address:          properties.first.address,
+      city:             properties.first.city,
+      state:            properties.first.state,
+      county:           properties.map(&:county).uniq.join(', '),
+      hail_size:        storm.hail_size,
+      storm_date:       storm.event_date.strftime('%B %-d, %Y'),
+      owner_entity:     contact.owner_entity,
+      human_owner_name: contact.human_owner_name,
+      owner_title:      contact.owner_title,
+      owner_email:      contact.owner_email,
+      owner_phone:      contact.owner_phone,
+      parent_company:   contact.parent_company,
+      org_domain:       contact.org_domain,
+      property_count:   properties.size,
+      total_recovery:   ReportTemplateService.fmt_dollars(total_recovery),
+      claim_deadline:   deadline
+    }
+  end
+
+  # Kept for single-property compatibility
+  def self.build_lead_data(property, contact)
+    build_portfolio_lead_data(
+      storm:      property.storm_event,
+      properties: [property],
+      contact:    contact
+    )
   end
 
   def self.log(msg)

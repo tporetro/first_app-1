@@ -10,22 +10,31 @@ class AiEmailComposerService
   MODEL = :"claude-opus-4-6"
 
   SYSTEM_PROMPT = <<~SYSTEM.freeze
-    You are Michael Johnson, Director of Commercial Services at Restoration GC,
-    a commercial roofing and storm damage restoration company.
+    You are Michael Johnson, Director of Commercial Services at Restoration GC —
+    an Austin-based general contractor specializing in large-loss commercial storm damage claims.
 
-    You write cold outreach emails to commercial property owners after hail storms.
+    Restoration GC's team includes licensed engineers, certified public adjusters, and insurance
+    attorneys. We handle the entire claim process: forensic inspection → engineering report →
+    PA-managed claim presentation → legal support if carrier disputes → restoration execution.
+    Property owners pay nothing out of pocket until the claim is approved and funded.
+
+    You write cold outreach emails to commercial property owners and portfolio managers after
+    hail storms. Your audience is sophisticated — they manage large industrial/commercial portfolios
+    and get cold email constantly. What cuts through is specificity, credibility, and a clear
+    financial stake.
+
     Your emails are:
-    - Concise (under 200 words in the body)
-    - Specific to the person's role and company context
-    - Urgent but not alarmist — you present forensic facts, not scare tactics
-    - Conversational — no corporate jargon, no filler phrases like "I hope this email finds you well"
-    - Focused on ONE thing: getting them to click the report link
+    - SHORT (150 words max in the body — they will not read more)
+    - Specific: exact address, exact hail size, exact storm date, exact dollar exposure
+    - Credible: you mention the engineering + PA + legal team — not just "roofing contractor"
+    - Urgent but factual: insurance filing deadlines are real; you state them, you don't manufacture them
+    - Conversational: no "I hope this finds you well", no "please don't hesitate", no passive voice
+    - One ask: click the report link. Not "call us", not "let's discuss" — read the report first.
 
-    You NEVER mention competitors, NEVER use superlatives, and NEVER make promises
-    you cannot keep. You always CC amy@restorationgc.net and note she will follow up
-    to schedule a call.
+    Close with: Amy on our team will reach out to schedule a 20-minute call. CC: amy@restorationgc.net
+    Signature: Michael Johnson | (512) 621-4201 | michael@restorationgc.net
 
-    Output ONLY the email body (no subject line, no headers). Start directly with "Hi [FirstName],"
+    Output ONLY the plain-text email body. Start with "Hi [FirstName]," — no subject line, no headers.
   SYSTEM
 
   # Returns { subject:, body:, variant: } or raises on error.
@@ -98,60 +107,86 @@ class AiEmailComposerService
   private
 
   def self.build_prompt(lead, report_url, variant)
-    first_name   = lead[:human_owner_name]&.split&.first || 'there'
-    title        = lead[:owner_title]
-    company      = lead[:owner_entity] || lead[:parent_company]
-    address      = lead[:address]
-    county       = lead[:county]
-    hail_size    = lead[:hail_size]
-    storm_date   = lead[:storm_date]
-    sq_ft        = lead[:sq_ft]
-    property_type = lead[:property_type] || 'commercial property'
+    first_name      = lead[:human_owner_name]&.split&.first || 'there'
+    title           = lead[:owner_title]
+    company         = lead[:owner_entity] || lead[:parent_company]
+    hail_size       = lead[:hail_size]
+    storm_date      = lead[:storm_date]
+    claim_deadline  = lead[:claim_deadline]
+    property_count  = lead[:property_count] || 1
+    total_recovery  = lead[:total_recovery]
+    research        = lead[:research] || {}
 
-    role_context = if title && company
-                     "They are #{title} of #{company}."
-                   else
-                     "They own a commercial property."
-                   end
+    # Build context block
+    if property_count > 1
+      property_context = "PORTFOLIO: #{property_count} properties affected. Total estimated recovery: #{total_recovery}."
+    else
+      sq_ft    = lead[:sq_ft]
+      recovery = sq_ft ? ReportTemplateService.fmt_dollars((sq_ft * ReportTemplateService::COST_PER_SQFT).to_i) : nil
+      property_context = "PROPERTY: #{lead[:address]}, #{lead[:county]} County. #{sq_ft ? "#{sq_ft.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse} sq ft." : ''} #{recovery ? "Estimated recovery: #{recovery}." : ''}"
+    end
 
-    sq_ft_context = sq_ft ? "The property is #{sq_ft.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse} sq ft." : ''
+    role_line = [title, company].compact.join(' at ')
+
+    research_hook = research[:hook].present? ? "Prospect research hook to naturally weave in (optional): #{research[:hook]}" : ''
+    company_ctx   = research[:company_context].present? ? "Company context: #{research[:company_context]}" : ''
 
     variant_angle = case variant.to_s
-                    when 'a' then 'Lead with the forensic report and what it reveals.'
-                    when 'b' then 'Lead with the financial risk and insurance claim opportunity.'
-                    when 'c' then 'Lead with urgency — carrier documentation deadlines are real.'
-                    when 'd' then 'Lead with the fact that most commercial owners don\'t know they have damage yet.'
-                    else 'Lead with the forensic report.'
+                    when 'a' then "Lead with the intelligence report — they have findings waiting for them."
+                    when 'b' then "Lead with the dollar exposure — #{total_recovery || 'seven figures'} at risk if undocumented."
+                    when 'c' then "Lead with the filing deadline — #{claim_deadline || 'time is running out'}."
+                    when 'd' then "Lead with hidden damage — most property owners don't know they have it."
+                    else "Lead with the intelligence report."
                     end
 
     <<~PROMPT
-      Write a cold outreach email for this specific situation:
+      Write a cold outreach email. Be specific. Be short. Make them want to click.
 
-      Recipient first name: #{first_name}
-      Role context: #{role_context}
-      Property: #{address}, #{county} County (#{property_type})
-      #{sq_ft_context}
-      Storm: #{hail_size}-inch hail on #{storm_date}
-      Report link: #{report_url}
+      RECIPIENT: #{first_name}#{role_line.present? ? ", #{role_line}" : ''}
+      STORM: #{hail_size}-inch hail on #{storm_date}
+      #{property_context}
+      FILING DEADLINE: #{claim_deadline || 'within 12 months of storm date'}
+      REPORT LINK: #{report_url}
 
-      Email angle: #{variant_angle}
+      #{company_ctx}
+      #{research_hook}
 
-      Remember: Amy (CC'd) will follow up to schedule a 20-minute call.
-      Michael's phone: (512) 621-4201
+      ANGLE FOR THIS EMAIL: #{variant_angle}
+
+      IMPORTANT:
+      - Mention our team includes engineers, public adjusters, and insurance attorneys — not just roofing
+      - No payment until claim is approved and funded
+      - The ask is: click the report link. That's it.
+      - 150 words max
     PROMPT
   end
 
   def self.compose_subject(lead, variant)
-    first_name = lead[:human_owner_name]&.split&.first
-    address    = lead[:address]
-    date       = lead[:storm_date]
+    first_name     = lead[:human_owner_name]&.split&.first
+    address        = lead[:address]
+    storm_date     = lead[:storm_date]
+    property_count = lead[:property_count] || 1
+    total_recovery = lead[:total_recovery]
+    claim_deadline = lead[:claim_deadline]
 
-    case variant.to_s
-    when 'a' then "Confidential: Storm Damage Intelligence Report — #{address}"
-    when 'b' then "#{address} — Hidden Hail Damage Risk (#{date})"
-    when 'c' then "Urgent: #{date} Storm Claim Window Closing — #{address}"
-    when 'd' then "#{first_name}: Your #{address} Was in the Hail Swath"
-    else "Confidential: Storm Damage Report — #{address}"
+    if property_count > 1
+      # Portfolio subject lines
+      case variant.to_s
+      when 'a' then "Confidential: #{property_count}-Property Damage Intelligence Brief — #{lead[:owner_entity]}"
+      when 'b' then "#{total_recovery} in Undocumented Hail Exposure — #{lead[:owner_entity]} Portfolio"
+      when 'c' then "#{lead[:owner_entity]}: #{property_count} Properties | Filing Window Closes #{claim_deadline}"
+      when 'd' then "#{first_name}: Your #{property_count} DFW Properties Were in the #{lead[:hail_size]}\" Hail Swath"
+      else "Confidential: Portfolio Damage Intelligence Brief — #{lead[:owner_entity]}"
+      end
+    else
+      # Single-property subject lines
+      case variant.to_s
+      when 'a' then "Confidential: Damage Intelligence Report — #{address}"
+      when 'b' then "#{address}: #{ReportTemplateService.fmt_dollars(((lead[:sq_ft] || 50_000) * ReportTemplateService::COST_PER_SQFT).to_i)} Hail Exposure"
+      when 'c' then "Filing Window Closes #{claim_deadline} — #{address}"
+      when 'd' then "#{first_name}: #{address} Was in the #{lead[:hail_size]}\" Hail Swath (#{storm_date})"
+      else "Confidential: Storm Damage Report — #{address}"
+      end
     end
   end
 
