@@ -28,14 +28,14 @@ class CadScraperService
   # ---------------------------------------------------------------------------
   REGISTRY = {
     # Dallas County — DCAD
-    # Full export: https://www.dallascad.org/AcctDetailRes.aspx  (account search)
-    # Bulk CSV:    https://www.dallascad.org/downloads/  (select "Real Property" or "Personal")
+    # Bulk data portal: https://www.dallascad.org/Downloads.aspx
+    # Files confirmed by Manus scrape_dcad.py: ACCOUNT_INFO.CSV + COM_DETAIL.CSV
+    # Both files live inside the same bulk ZIP export.
     'Dallas' => {
       state:    'TX',
       adapter:  :dcad,
       urls: {
-        real:     'https://www.dallascad.org/downloads/real_acct_owner.zip',
-        personal: 'https://www.dallascad.org/downloads/pers_acct_owner.zip'
+        bulk: 'https://www.dallascad.org/Downloads.aspx?type=2'
       }
     },
 
@@ -152,37 +152,73 @@ class CadScraperService
   # ---------------------------------------------------------------------------
   # DCAD adapter (Dallas County)
   # ---------------------------------------------------------------------------
-  # DCAD real_acct_owner.csv columns (pipe-delimited):
-  #   acct_num | owner_name | addr1 | addr2 | city | zip | state_code | land_sqft | bldg_sqft | ...
-  # (Actual column layout varies by export year; map by header name)
+  # DCAD bulk ZIP contains two files confirmed by Manus scrape_dcad.py:
+  #
+  #   ACCOUNT_INFO.CSV — tab-delimited, columns include:
+  #     ACCOUNT, OWNER_NAME, SITUS_NUM, SITUS_STREET, SITUS_STREET_SFX,
+  #     SITUS_CITY, SITUS_ZIP, STATE_CD, GIS_LAT, GIS_LONG, OWNER_CITY,
+  #     OWNER_STATE, OWNER_ZIP
+  #
+  #   COM_DETAIL.CSV — tab-delimited, columns include:
+  #     ACCOUNT, TOTAL_SQ_FT, YEAR_BUILT, ACTUAL_AGE, BUILDING_CLASS,
+  #     FOUNDATION_TYPE, ROOF_STRUCTURE, EXTERIOR_WALL_TYPE
+  #
+  # We join on ACCOUNT to get sq_ft from COM_DETAIL, owner + address from ACCOUNT_INFO.
   #
   def self.fetch_dcad(county, config)
-    records = []
+    extract_dir = nil
 
-    config[:urls].each do |type, url|
-      csv_path = download_and_extract(url, county, type.to_s)
-      next unless csv_path
+    # Download the bulk ZIP (single URL for DCAD)
+    url = config[:urls][:bulk]
+    zip_path = download_and_extract(url, county, 'bulk')
 
-      CSV.foreach(csv_path, headers: true, col_sep: detect_delimiter(csv_path),
-                             encoding: 'ISO-8859-1:UTF-8', liberal_parsing: true) do |row|
-        next unless COMMERCIAL_CODES.include?(row['state_cd']&.strip ||
-                                              row['state_code']&.strip ||
-                                              row['prop_type_cd']&.strip)
+    # download_and_extract returns the largest file; we need the directory instead
+    # Re-derive extract dir from naming convention
+    extract_dir_path = TMP_DIR.join("#{county.downcase}_bulk_extracted")
 
-        sq_ft = (row['bldg_sqft'] || row['impr_sqft'] || row['tot_sqft'] || '0').to_f
+    account_file = Dir[extract_dir_path.join('ACCOUNT_INFO.CSV')].first ||
+                   Dir[extract_dir_path.join('account_info.csv')].first
+    detail_file  = Dir[extract_dir_path.join('COM_DETAIL.CSV')].first ||
+                   Dir[extract_dir_path.join('com_detail.csv')].first
 
-        records << {
-          address:      clean([row['situs_num'], row['situs_street'], row['situs_street_sfx']].compact.join(' ')),
-          city:         clean(row['situs_city'] || row['city']),
-          county:       county,
-          state_abbr:   'TX',
-          state_code:   clean(row['state_cd'] || row['state_code'] || row['prop_type_cd']),
-          sq_ft:        sq_ft,
-          owner_entity: clean(row['owner_name'] || row['agent_name']),
-          lat:          row['lat']&.to_f,
-          lon:          row['lon']&.to_f || row['lng']&.to_f
-        }
+    unless account_file
+      log "DCAD: ACCOUNT_INFO.CSV not found in extract — falling back to generic parse of #{zip_path}"
+      return fetch_generic_csv(county, { urls: { bulk: url } })
+    end
+
+    # Build sq_ft lookup from COM_DETAIL
+    sq_ft_by_account = {}
+    if detail_file
+      CSV.foreach(detail_file, headers: true, col_sep: "\t",
+                               encoding: 'ISO-8859-1:UTF-8', liberal_parsing: true) do |row|
+        acct = row['ACCOUNT']&.strip
+        sq_ft_by_account[acct] = (row['TOTAL_SQ_FT'] || '0').to_f if acct
       end
+    end
+
+    # Parse ACCOUNT_INFO, filter to commercial state codes
+    records = []
+    CSV.foreach(account_file, headers: true, col_sep: "\t",
+                               encoding: 'ISO-8859-1:UTF-8', liberal_parsing: true) do |row|
+      state_code = clean(row['STATE_CD'])
+      next unless COMMERCIAL_CODES.include?(state_code)
+
+      acct    = row['ACCOUNT']&.strip
+      sq_ft   = sq_ft_by_account[acct] || 0
+      address = clean([row['SITUS_NUM'], row['SITUS_STREET'], row['SITUS_STREET_SFX']]
+                      .map(&:to_s).map(&:strip).reject(&:empty?).join(' '))
+
+      records << {
+        address:      address,
+        city:         clean(row['SITUS_CITY']),
+        county:       county,
+        state_abbr:   'TX',
+        state_code:   state_code,
+        sq_ft:        sq_ft,
+        owner_entity: clean(row['OWNER_NAME']),
+        lat:          row['GIS_LAT']&.to_f,
+        lon:          row['GIS_LONG']&.to_f
+      }
     end
 
     records.uniq { |r| r[:address] }

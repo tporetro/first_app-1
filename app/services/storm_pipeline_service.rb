@@ -47,8 +47,11 @@ class StormPipelineService
       port_count  = report_data[:portfolio_reports].size
       log "Phase 4: #{prop_count} property reports + #{port_count} portfolio overviews generated"
 
-      sent       = phase_5_send_outreach(properties, contacts, report_data)
-      log "Phase 5: #{sent} outreach emails sent"
+      scripts    = phase_5_generate_scripts(storm, properties, contacts, report_data)
+      log "Phase 5: #{scripts.size} presentation scripts generated"
+
+      sent       = phase_6_send_outreach(properties, contacts, report_data)
+      log "Phase 6: #{sent} outreach emails sent"
 
       storm.update!(status: 'complete')
       PushoverService.notify(
@@ -217,7 +220,46 @@ class StormPipelineService
     { property_reports: property_reports, portfolio_reports: portfolio_reports }
   end
 
-  def self.phase_5_send_outreach(properties, contacts, report_data)
+  # Phase 5: Generate personalized presentation scripts for each owner.
+  # Scripts are written to tmp/presentation_scripts/ as Markdown files and
+  # returned as an array of hashes: [{ owner_entity:, path:, markdown: }, ...]
+  def self.phase_5_generate_scripts(storm, properties, contacts, report_data)
+    property_reports  = report_data[:property_reports]
+    portfolio_reports = report_data[:portfolio_reports]
+    scripts           = []
+    scripts_dir       = Rails.root.join('tmp', 'presentation_scripts', storm.id.to_s)
+    FileUtils.mkdir_p(scripts_dir)
+
+    by_owner = properties.group_by(&:owner_entity)
+
+    by_owner.each do |entity, owner_properties|
+      contact = contacts.find { |c| c.owner_entity == entity }
+      next unless contact
+
+      primary_report = portfolio_reports[entity] ||
+                       property_reports.find { |r| r.property_id == owner_properties.first.id }
+      report_url = primary_report&.gamma_url || '#'
+
+      result = PresentationScriptService.generate(
+        storm:      storm,
+        properties: owner_properties,
+        contact:    contact,
+        report_url: report_url
+      )
+      next unless result
+
+      filename = "#{entity.parameterize}_script.md"
+      path     = scripts_dir.join(filename)
+      File.write(path, result[:markdown])
+
+      scripts << { owner_entity: entity, path: path.to_s, markdown: result[:markdown] }
+      log "Presentation script saved: #{filename}"
+    end
+
+    scripts
+  end
+
+  def self.phase_6_send_outreach(properties, contacts, report_data)
     property_reports  = report_data[:property_reports]
     portfolio_reports = report_data[:portfolio_reports]
     sent = 0
