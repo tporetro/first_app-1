@@ -1,0 +1,102 @@
+<h1>Contacts</h1>
+<p class="subtitle">Search and manage all enriched owner contacts across storms</p>
+
+<!-- Search + filters -->
+<%= form_tag contacts_path, method: :get, style: 'margin-bottom:24px' do %>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <%= text_field_tag :q, params[:q],
+          placeholder: 'Search name, email, company…',
+          style: 'background:#1a1d27;border:1px solid #2d3148;color:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:13px;width:280px' %>
+
+    <%= select_tag :deal_status,
+          options_for_select([
+            ['All Statuses', ''],
+            ['Prospecting',    'prospecting'],
+            ['In Negotiation', 'in_negotiation'],
+            ['Won',            'won'],
+            ['Lost',           'lost'],
+            ['Do Not Contact', 'do_not_contact']
+          ], params[:deal_status]),
+          style: 'background:#1a1d27;border:1px solid #2d3148;color:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:13px' %>
+
+    <%= select_tag :state,
+          options_for_select([['All States', '']] +
+            %w[TX OK KS CO NE MO AR LA MS AL GA TN NC SC].map { |s| [s, s] },
+            params[:state]),
+          style: 'background:#1a1d27;border:1px solid #2d3148;color:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:13px' %>
+
+    <%= submit_tag 'Search',
+          style: 'background:#2563eb;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer' %>
+
+    <% if params[:q].present? || params[:deal_status].present? || params[:state].present? %>
+      <%= link_to 'Clear', contacts_path, style: 'font-size:13px;color:#64748b' %>
+    <% end %>
+  </div>
+<% end %>
+
+<!-- Deal status summary -->
+<div class="stats-grid" style="margin-bottom:24px">
+  <% Contact::DEAL_STATUS_LABELS.each do |status, meta| %>
+    <div class="stat-card" style="cursor:pointer" onclick="window.location='<%= contacts_path(deal_status: status) %>'">
+      <div class="label"><%= meta[:label] %></div>
+      <div class="value"><%= @status_counts[status] || 0 %></div>
+    </div>
+  <% end %>
+</div>
+
+<!-- Results table -->
+<div class="table-wrap">
+  <% if @contacts.empty? %>
+    <div class="empty">No contacts match your search.</div>
+  <% else %>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Company</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Storm</th>
+          <th>State</th>
+          <th>Deal Status</th>
+          <th>Enrichment</th>
+          <th>Last Activity</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @contacts.each do |contact| %>
+          <% meta = Contact::DEAL_STATUS_LABELS[contact.deal_status] || Contact::DEAL_STATUS_LABELS['prospecting'] %>
+          <tr>
+            <td>
+              <strong><%= contact.human_owner_name || '—' %></strong>
+              <% if contact.owner_title.present? %>
+                <div style="font-size:11px;color:#64748b"><%= contact.owner_title %></div>
+              <% end %>
+            </td>
+            <td><%= contact.parent_company || contact.owner_entity %></td>
+            <td>
+              <% if contact.owner_email.present? %>
+                <a href="mailto:<%= contact.owner_email %>"><%= contact.owner_email %></a>
+              <% else %>
+                <span style="color:#475569">—</span>
+              <% end %>
+            </td>
+            <td><%= contact.owner_phone || '—' %></td>
+            <td>
+              <%= link_to contact.storm_event.metro_area, pipeline_path(contact.storm_event),
+                    style: 'font-size:12px' %>
+            </td>
+            <td><%= contact.storm_event.state %></td>
+            <td><span class="badge <%= meta[:badge] %>"><%= meta[:label] %></span></td>
+            <td><span class="badge badge-slate"><%= contact.enrichment_source || '—' %></span></td>
+            <td style="color:#64748b;font-size:12px">
+              <%= contact.last_activity_at&.strftime('%-m/%-d/%y') || contact.updated_at.strftime('%-m/%-d/%y') %>
+            </td>
+            <td><%= link_to 'View →', contact_path(contact) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

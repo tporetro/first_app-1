@@ -1,0 +1,194 @@
+<%= link_to '← All Contacts', contacts_path, class: 'back-link' %>
+
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:28px">
+  <!-- Contact header -->
+  <div>
+    <h1><%= @contact.human_owner_name || @contact.owner_entity %></h1>
+    <p class="subtitle" style="margin-bottom:10px">
+      <% if @contact.owner_title.present? %>
+        <%= @contact.owner_title %> &nbsp;·&nbsp;
+      <% end %>
+      <%= @contact.parent_company || @contact.owner_entity %>
+      &nbsp;·&nbsp; <%= @storm.state %>
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <% if @contact.owner_email.present? %>
+        <a href="mailto:<%= @contact.owner_email %>" class="badge badge-blue"><%= @contact.owner_email %></a>
+      <% end %>
+      <% if @contact.owner_phone.present? %>
+        <span class="badge badge-slate">📞 <%= @contact.owner_phone %></span>
+      <% end %>
+      <% if @contact.owner_linkedin.present? %>
+        <a href="<%= @contact.owner_linkedin %>" target="_blank" class="badge badge-slate">LinkedIn</a>
+      <% end %>
+      <% if @contact.org_domain.present? %>
+        <a href="https://<%= @contact.org_domain %>" target="_blank" class="badge badge-slate"><%= @contact.org_domain %></a>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Deal status + quick actions -->
+  <div style="background:#1a1d27;border:1px solid #2d3148;border-radius:10px;padding:16px 20px;min-width:220px">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:8px">Deal Status</div>
+    <%= form_tag contact_path(@contact), method: :patch, id: 'status-form' do %>
+      <%= select_tag :deal_status,
+            options_for_select(Contact::DEAL_STATUS_LABELS.map { |k, v| [v[:label], k] }, @contact.deal_status),
+            onchange: 'document.getElementById("status-form").submit()',
+            style: 'background:#12151f;border:1px solid #2d3148;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:13px;width:100%;margin-bottom:0' %>
+    <% end %>
+    <div style="margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px">Properties</div>
+    <div style="font-size:22px;font-weight:700;color:#f1f5f9"><%= @properties.count %></div>
+    <div style="margin-top:8px;font-size:11px;color:#64748b">
+      Storm: <%= link_to @storm.metro_area, pipeline_path(@storm), style: 'color:#60a5fa' %><br>
+      <%= @storm.event_date.strftime('%B %-d, %Y') %> · <%= @storm.hail_size %>" hail
+    </div>
+  </div>
+</div>
+
+<!-- Properties -->
+<% if @properties.any? %>
+  <h2 style="margin-bottom:12px">Properties (<%= @properties.count %>)</h2>
+  <div class="table-wrap" style="margin-bottom:28px">
+    <table>
+      <thead>
+        <tr>
+          <th>Address</th>
+          <th>Type</th>
+          <th>Sq Ft</th>
+          <th>Report</th>
+          <th>Email</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @properties.each do |prop| %>
+          <% campaign = prop.email_outreaches.min_by(&:created_at)&.email_campaign %>
+          <tr>
+            <td class="monospace"><%= prop.address %>, <%= prop.city %></td>
+            <td><span class="badge badge-slate"><%= prop.property_type || '—' %></span></td>
+            <td><%= prop.sq_ft ? number_with_delimiter(prop.sq_ft) : '—' %></td>
+            <td>
+              <% if prop.gamma_report %>
+                <%= link_to '📊 Open', prop.gamma_report.gamma_url, target: '_blank' %>
+              <% else %>—<% end %>
+            </td>
+            <td>
+              <% if campaign %>
+                <% status = campaign.replied_at ? 'replied' : campaign.clicked_at ? 'clicked' :
+                            campaign.opened_at ? 'opened' : 'sent' %>
+                <% badge  = { 'replied' => 'badge-amber', 'clicked' => 'badge-green',
+                              'opened'  => 'badge-green', 'sent' => 'badge-slate' }[status] %>
+                <span class="badge <%= badge %>"><%= status %></span>
+              <% else %>—<% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<!-- Timeline + Notes side-by-side -->
+<div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start">
+
+  <!-- Activity timeline -->
+  <div>
+    <h2 style="margin-bottom:16px">Activity Timeline</h2>
+    <% if @timeline.empty? %>
+      <div class="table-wrap"><div class="empty">No activity recorded yet.</div></div>
+    <% else %>
+      <div style="position:relative;padding-left:28px">
+        <!-- vertical line -->
+        <div style="position:absolute;left:7px;top:0;bottom:0;width:2px;background:#2d3148"></div>
+
+        <% @timeline.each do |event| %>
+          <%
+            dot_color = case event[:type]
+                        when :replied  then '#fbbf24'
+                        when :clicked  then '#34d399'
+                        when :opened   then '#34d399'
+                        when :storm    then '#60a5fa'
+                        when :report   then '#a78bfa'
+                        else                '#475569'
+                        end
+          %>
+          <div style="position:relative;margin-bottom:18px">
+            <!-- dot -->
+            <div style="position:absolute;left:-24px;top:3px;width:12px;height:12px;border-radius:50%;background:<%= dot_color %>;border:2px solid #0f1117"></div>
+
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
+              <span style="font-size:14px"><%= event[:icon] %></span>
+              <span style="font-weight:600;color:#f1f5f9;font-size:13px"><%= event[:title] %></span>
+              <span style="font-size:11px;color:#475569;margin-left:auto;white-space:nowrap">
+                <%= event[:at]&.strftime('%b %-d, %Y %H:%M') %>
+              </span>
+            </div>
+
+            <% if event[:body].present? %>
+              <div style="font-size:12px;color:#64748b;padding-left:22px;word-break:break-all">
+                <% if event[:type] == :report && event[:body] =~ /\Ahttps?:/ %>
+                  <%= link_to 'View Report →', event[:body], target: '_blank', style: 'color:#a78bfa' %>
+                <% else %>
+                  <%= event[:body] %>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Notes panel -->
+  <div>
+    <h2 style="margin-bottom:12px">Notes</h2>
+    <div style="background:#1a1d27;border:1px solid #2d3148;border-radius:10px;padding:16px">
+      <%= form_tag contact_path(@contact), method: :patch do %>
+        <%= text_area_tag :notes, @contact.notes,
+              placeholder: 'Add notes about this contact, conversations, decisions…',
+              rows: 10,
+              style: 'width:100%;background:#12151f;border:1px solid #2d3148;color:#e2e8f0;
+                      padding:10px;border-radius:6px;font-size:13px;resize:vertical;
+                      font-family:inherit;line-height:1.5' %>
+        <%= submit_tag 'Save Notes',
+              style: 'margin-top:10px;background:#2563eb;color:#fff;border:none;
+                      padding:7px 16px;border-radius:6px;font-size:13px;cursor:pointer;width:100%' %>
+      <% end %>
+
+      <% if @contact.notes.present? %>
+        <div style="margin-top:12px;font-size:11px;color:#475569">
+          Last updated <%= @contact.updated_at.strftime('%b %-d at %H:%M') %>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Quick stats -->
+    <div style="background:#1a1d27;border:1px solid #2d3148;border-radius:10px;padding:16px;margin-top:14px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:12px">Outreach Summary</div>
+      <%
+        total_sent   = @outreaches.count { |o| o.status == 'sent' }
+        total_opened = @outreaches.count { |o| o.email_campaign&.opened_at }
+        total_clicked= @outreaches.count { |o| o.email_campaign&.clicked_at }
+        replied      = @outreaches.any?  { |o| o.email_campaign&.replied_at }
+      %>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div style="font-size:11px;color:#64748b">Sent</div>
+          <div style="font-size:20px;font-weight:700"><%= total_sent %></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#64748b">Opened</div>
+          <div style="font-size:20px;font-weight:700;color:<%= total_opened > 0 ? '#34d399' : '#f1f5f9' %>"><%= total_opened %></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#64748b">Clicked</div>
+          <div style="font-size:20px;font-weight:700;color:<%= total_clicked > 0 ? '#34d399' : '#f1f5f9' %>"><%= total_clicked %></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#64748b">Replied</div>
+          <div style="font-size:20px;font-weight:700;color:<%= replied ? '#fbbf24' : '#f1f5f9' %>"><%= replied ? '★ YES' : 'No' %></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

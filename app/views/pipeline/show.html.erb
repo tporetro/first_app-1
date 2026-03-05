@@ -162,12 +162,14 @@
           <th>Email</th>
           <th>Phone</th>
           <th>Company</th>
-          <th>Source</th>
-          <th>Confidence</th>
+          <th>Deal Status</th>
+          <th>Enrichment</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
         <% @contacts.each do |contact| %>
+          <% deal_meta = Contact::DEAL_STATUS_LABELS[contact.deal_status] || Contact::DEAL_STATUS_LABELS['prospecting'] %>
           <tr>
             <td><strong><%= contact.human_owner_name || '—' %></strong></td>
             <td style="color:#94a3b8"><%= contact.owner_title || '—' %></td>
@@ -180,14 +182,9 @@
             </td>
             <td><%= contact.owner_phone || '—' %></td>
             <td><%= contact.parent_company || contact.owner_entity %></td>
-            <td>
-              <span class="badge badge-slate"><%= contact.enrichment_source || '—' %></span>
-            </td>
-            <td>
-              <% badge = contact.status == 'enriched' ? 'badge-green' :
-                         contact.status == 'low_confidence' ? 'badge-amber' : 'badge-slate' %>
-              <span class="badge <%= badge %>"><%= contact.status %></span>
-            </td>
+            <td><span class="badge <%= deal_meta[:badge] %>"><%= deal_meta[:label] %></span></td>
+            <td><span class="badge badge-slate"><%= contact.enrichment_source || '—' %></span></td>
+            <td><%= link_to 'View →', contact_path(contact) %></td>
           </tr>
         <% end %>
       </tbody>

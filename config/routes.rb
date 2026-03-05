@@ -7,6 +7,9 @@ FirstApp::Application.routes.draw do
     resources :reports, only: [:index]
   end
 
+  # CRM — contacts search, timeline, notes
+  resources :contacts, only: [:index, :show, :update]
+
   # Resend email tracking webhooks
   namespace :webhooks do
     post :resend,          to: 'resend#event'

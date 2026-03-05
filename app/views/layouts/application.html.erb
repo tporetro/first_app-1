@@ -19,6 +19,7 @@
           display: flex; align-items: center; gap: 24px; height: 52px; }
     nav .brand { font-weight: 700; font-size: 15px; color: #f1f5f9; letter-spacing: -.3px; }
     nav .brand span { color: #60a5fa; }
+  nav a.active { color: #e2e8f0; }
     nav a { color: #94a3b8; font-size: 13px; }
     nav a:hover { color: #e2e8f0; text-decoration: none; }
     nav .spacer { flex: 1; }
@@ -95,6 +96,7 @@
 <nav>
   <span class="brand">Claw<span>bot</span></span>
   <%= link_to 'Storms', pipeline_index_path %>
+  <%= link_to 'Contacts', contacts_path %>
   <div class="spacer"></div>
   <%= button_to 'Run Pipeline Now', trigger_pipeline_index_path,
         method: :post, class: 'trigger-btn',
