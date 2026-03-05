@@ -67,8 +67,9 @@ class ReportTemplateService
   }.freeze
 
   # ── Michael Johnson — expert credentials ─────────────────────────────────
+  # Set status: 'published' once the issue is confirmed live; use 'forthcoming' until then.
   MICHAEL_PRESS = [
-    { outlet: 'Roofing Contractor Magazine', role: 'Featured expert on storm damage' }
+    { outlet: 'Roofing Contractor Magazine', role: 'Featured expert on storm damage', status: 'forthcoming' }
   ].freeze
 
   # ── Voss Law "First Offer vs. Settlement" results (from published document)
@@ -220,7 +221,7 @@ class ReportTemplateService
       ## The Win-in-Advance™ Approach
 
       **#{TEAM[:name]}** has spent **#{TEAM[:years_experience]} years** protecting commercial
-      policyholders and is a published expert on storm damage (*Roofing Contractor Magazine*).
+      policyholders and is a recognized expert on storm damage#{MICHAEL_PRESS.first[:status] == 'published' ? ', as featured in *Roofing Contractor Magazine*' : ''}.
       He works alongside **#{LEGAL_PARTNER[:name]}** — #{LEGAL_PARTNER[:tagline]}, as seen in
       #{LEGAL_PARTNER[:media].first(4).join(', ')}, and others.
 
@@ -403,7 +404,7 @@ class ReportTemplateService
       ## About the Team
 
       **#{TEAM[:name]}** has spent **#{TEAM[:years_experience]} years** protecting commercial
-      policyholders and is a published expert on storm damage (*Roofing Contractor Magazine*).
+      policyholders and is a recognized expert on storm damage#{MICHAEL_PRESS.first[:status] == 'published' ? ', as featured in *Roofing Contractor Magazine*' : ''}.
 
       He works alongside **#{LEGAL_PARTNER[:name]}** — #{LEGAL_PARTNER[:tagline]}.
 

@@ -69,7 +69,10 @@ class ResendEmailService
 
   SENDER_YEARS       = 22
   SENDER_AVG_RETURN  = '780%'
-  SENDER_PRESS       = 'Roofing Contractor Magazine (featured expert on storm damage)'.freeze
+  # Set to nil until the Roofing Contractor Magazine issue is confirmed published
+  SENDER_PRESS_FORTHCOMING = 'Roofing Contractor Magazine (featured expert on storm damage — forthcoming)'.freeze
+  SENDER_PRESS_PUBLISHED   = 'Roofing Contractor Magazine (featured expert on storm damage)'.freeze
+  SENDER_PRESS             = SENDER_PRESS_FORTHCOMING  # flip to SENDER_PRESS_PUBLISHED when issue is live
 
   LEGAL_PARTNER_NAME   = 'The Voss Law Firm, P.C.'.freeze
   LEGAL_PARTNER_WEB    = 'www.DeniedClaim.com'.freeze
