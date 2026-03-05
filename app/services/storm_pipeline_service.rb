@@ -41,28 +41,38 @@ class StormPipelineService
         message: "#{storm_data[:hail_size]}\" hail in #{storm_data[:location]}. Starting pipeline."
       )
 
-      properties = phase_2_load_properties(storm)
-      log "Phase 2: #{properties.size} properties loaded for #{storm.name}"
+      begin
+        properties = phase_2_load_properties(storm)
+        log "Phase 2: #{properties.size} properties loaded for #{storm.name}"
 
-      contacts   = phase_3_enrich_contacts(storm, properties)
-      log "Phase 3: #{contacts.size} contacts enriched"
+        contacts   = phase_3_enrich_contacts(storm, properties)
+        log "Phase 3: #{contacts.size} contacts enriched"
 
-      report_data = phase_4_generate_reports(storm, properties, contacts)
-      prop_count  = report_data[:property_reports].size
-      port_count  = report_data[:portfolio_reports].size
-      log "Phase 4: #{prop_count} property reports + #{port_count} portfolio overviews generated"
+        report_data = phase_4_generate_reports(storm, properties, contacts)
+        prop_count  = report_data[:property_reports].size
+        port_count  = report_data[:portfolio_reports].size
+        log "Phase 4: #{prop_count} property reports + #{port_count} portfolio overviews generated"
 
-      scripts    = phase_5_generate_scripts(storm, properties, contacts, report_data)
-      log "Phase 5: #{scripts.size} presentation scripts generated"
+        scripts    = phase_5_generate_scripts(storm, properties, contacts, report_data)
+        log "Phase 5: #{scripts.size} presentation scripts generated"
 
-      sent       = phase_6_send_outreach(properties, contacts, report_data)
-      log "Phase 6: #{sent} outreach emails sent"
+        sent       = phase_6_send_outreach(properties, contacts, report_data)
+        log "Phase 6: #{sent} outreach emails sent"
 
-      storm.update!(status: 'complete')
-      PushoverService.notify(
-        title: '✅ Pipeline Complete',
-        message: "#{sent} emails sent for #{storm.name}"
-      )
+        storm.update!(status: 'complete')
+        PushoverService.notify(
+          title: '✅ Pipeline Complete',
+          message: "#{sent} emails sent for #{storm.name}"
+        )
+      rescue StandardError => e
+        error_msg = "#{e.class}: #{e.message}"
+        log "ERROR processing #{storm.name}: #{error_msg}"
+        storm.update(status: 'error')
+        PushoverService.notify(
+          title: '❌ Pipeline Error',
+          message: "#{storm.name} failed — #{error_msg.truncate(200)}"
+        )
+      end
     end
 
     log "=== Pipeline Finished ==="

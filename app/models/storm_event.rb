@@ -11,5 +11,6 @@ class StormEvent < ActiveRecord::Base
   scope :detected,   -> { where(status: 'detected') }
   scope :processing, -> { where(status: 'processing') }
   scope :complete,   -> { where(status: 'complete') }
+  scope :error,      -> { where(status: 'error') }
   scope :recent,     -> { order(event_date: :desc) }
 end
