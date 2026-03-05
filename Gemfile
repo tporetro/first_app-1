@@ -11,6 +11,9 @@ gem 'anthropic'
 # CSV processing (Phase 2 property import)
 gem 'smarter_csv'
 
+# ZIP file extraction (Phase 2 CAD bulk download unpacking)
+gem 'rubyzip'
+
 # HTTP (used by service objects — stdlib Net::HTTP is fine but this is cleaner)
 gem 'httparty'
 

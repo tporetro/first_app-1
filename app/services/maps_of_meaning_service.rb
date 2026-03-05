@@ -193,7 +193,15 @@ class MapsOfMeaningService
   # Step 3: Qualification filter
   # ---------------------------------------------------------------------------
   def self.qualifies?(record)
-    return false unless COMMERCIAL_STATE_CODES.include?(record[:state_code])
+    state_code = record[:state_code].to_s
+    # TX uses specific DPS codes; other states use varying CAMA codes.
+    # CadScraperService already pre-filters to commercial before returning records,
+    # so for non-TX counties we accept any non-blank code.
+    if record[:state_abbr].to_s == 'TX' || record[:state_abbr].blank?
+      return false unless COMMERCIAL_STATE_CODES.include?(state_code)
+    else
+      return false if state_code.blank?
+    end
     return false if (record[:sq_ft] || 0) < MIN_SQ_FT
     return false if record[:address].blank?
     true

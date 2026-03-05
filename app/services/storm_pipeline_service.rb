@@ -385,22 +385,6 @@ class StormPipelineService
     nil
   end
 
-  def self.build_lead_data(property, contact)
-    {
-      address:         property.address,
-      county:          property.county,
-      hail_size:       property.storm_event.hail_size,
-      storm_date:      property.storm_event.event_date.strftime('%B %-d, %Y'),
-      owner_entity:    property.owner_entity,
-      human_owner_name: contact.human_owner_name,
-      owner_title:     contact.owner_title,
-      owner_email:     contact.owner_email,
-      owner_phone:     contact.owner_phone,
-      parent_company:  contact.parent_company,
-      org_domain:      contact.org_domain
-    }
-  end
-
   # Build lead data for multi-property portfolio outreach
   def self.build_portfolio_lead_data(storm:, properties:, contact:)
     total_recovery = properties.sum { |p| ((p.sq_ft || 0) * ReportTemplateService::COST_PER_SQFT).to_i }
