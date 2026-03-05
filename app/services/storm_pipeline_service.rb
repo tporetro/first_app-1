@@ -94,10 +94,12 @@ class StormPipelineService
   end
 
   def self.phase_2_load_properties(storm)
-    # Returns existing Property records for this storm.
-    # Properties are populated by the maps-of-meaning CSV import task
-    # (rake pipeline:import_properties[storm_id,csv_path]).
-    storm.properties.where(status: 'identified')
+    # Auto-discover commercial properties via CAD scraping + Claude Vision boundary analysis.
+    # Falls back to any manually-imported properties if CAD returns nothing.
+    auto_count = MapsOfMeaningService.run(storm)
+    log "Phase 2 (MapsOfMeaning): #{auto_count} properties auto-imported from CAD" if auto_count > 0
+
+    storm.properties.reload.where(status: 'identified')
   end
 
   def self.phase_3_enrich_contacts(storm, properties)
