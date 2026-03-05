@@ -16,8 +16,8 @@ class CreateProperties < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :properties, :storm_event_id
-    add_index :properties, :status
-    add_index :properties, :owner_entity
+    add_index :properties, :storm_event_id unless index_exists?(:properties, :storm_event_id)
+    add_index :properties, :status unless index_exists?(:properties, :status)
+    add_index :properties, :owner_entity unless index_exists?(:properties, :owner_entity)
   end
 end
