@@ -145,6 +145,28 @@ namespace :pipeline do
   end
 
   # ---------------------------------------------------------------------------
+  # Demo: wipe and re-seed Dallas demo data
+  # Usage: rake demo:seed_dallas
+  # ---------------------------------------------------------------------------
+end
+
+namespace :demo do
+  desc 'Wipe all data and reseed with Dallas demo storm data (for presentations)'
+  task seed_dallas: :environment do
+    puts "Wiping existing data..."
+    EmailCampaign.delete_all
+    EmailOutreach.delete_all
+    GammaReport.delete_all
+    Contact.delete_all
+    Property.delete_all
+    StormEvent.delete_all
+    puts "Running Dallas seed..."
+    load Rails.root.join('db', 'seeds.rb')
+  end
+end
+
+namespace :pipeline do
+  # ---------------------------------------------------------------------------
   # Variant performance report
   # ---------------------------------------------------------------------------
   desc 'Print A/B/C/D variant performance for a storm (rake pipeline:variants[storm_id])'
