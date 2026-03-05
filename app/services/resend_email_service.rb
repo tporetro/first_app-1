@@ -69,9 +69,11 @@ class ResendEmailService
 
   SENDER_YEARS       = 22
   SENDER_AVG_RETURN  = '780%'
+  SENDER_PRESS       = 'Roofing Contractor Magazine (featured expert on storm damage)'.freeze
 
-  LEGAL_PARTNER_NAME = 'The Voss Law Firm, P.C.'.freeze
-  LEGAL_PARTNER_WEB  = 'www.DeniedClaim.com'.freeze
+  LEGAL_PARTNER_NAME   = 'The Voss Law Firm, P.C.'.freeze
+  LEGAL_PARTNER_WEB    = 'www.DeniedClaim.com'.freeze
+  LEGAL_PARTNER_MEDIA  = 'CBS · NBC · ABC · Forbes · Inc. 500 · Super Lawyers'.freeze
 
   # Variant subject lines for A/B/C/D/E/F/G testing
   SUBJECT_VARIANTS = {
@@ -321,6 +323,10 @@ class ResendEmailService
           #{SENDER_TITLE}<br>
           #{SENDER_COMPANY}<br>
           #{SENDER_PHONE}
+        </p>
+        <p style="font-size:12px; color:#888; border-top:1px solid #eee; padding-top:10px;">
+          #{SENDER_YEARS} years protecting commercial policyholders &bull; Featured expert, #{SENDER_PRESS}<br>
+          Legal partner: #{LEGAL_PARTNER_NAME} (#{LEGAL_PARTNER_MEDIA}) &bull; #{LEGAL_PARTNER_WEB}
         </p>
       </div>
     HTML

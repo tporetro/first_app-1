@@ -34,6 +34,25 @@ class ReportTemplateService
     avg_return:    '780%',   # published: "Recover Up to 780% More on Your Insurance Claim"
     availability:  '24 hours a day, 7 days a week, 365 days a year',
     claim_types:   %w[Industrial Marine Condominium Commercial Agricultural Governmental Church Residential],
+    # Media credentials — as seen in
+    media: ['CBS', 'NBC', 'ABC', 'Forbes', 'Lifetime', 'Inc. 500', 'Houston Press', 'News 92 FM'],
+    # Legal industry recognition
+    awards: [
+      'Super Lawyers',
+      'Super Lawyers Rising Stars',
+      'Million Dollar Advocates Forum',
+      'The National Trial Lawyers — Top 100 Trial Lawyers',
+      'The National Top 40 Under 40 Trial Lawyers',
+      "Houston's Top Lawyers — H Texas"
+    ],
+    # 5-stage case cycle (from published diagram)
+    case_cycle: [
+      { stage: 'Client Meeting',       detail: 'Engage legal services — free consultation' },
+      { stage: 'Investigate',          detail: 'Full forensic analysis of loss' },
+      { stage: 'Define Course',        detail: 'Formal demand letter to carrier' },
+      { stage: 'Negotiate',            detail: 'Secure maximum offer' },
+      { stage: 'Resolution & Payment', detail: 'Settlement proceeds to client' }
+    ],
     services: [
       'Review your policy coverage',
       'Assess the extent of the loss',
@@ -46,6 +65,11 @@ class ReportTemplateService
       'Coordinate with your mortgage company for timely fund release'
     ]
   }.freeze
+
+  # ── Michael Johnson — expert credentials ─────────────────────────────────
+  MICHAEL_PRESS = [
+    { outlet: 'Roofing Contractor Magazine', role: 'Featured expert on storm damage' }
+  ].freeze
 
   # ── Voss Law "First Offer vs. Settlement" results (from published document)
   VOSS_RESULTS = [
@@ -196,10 +220,12 @@ class ReportTemplateService
       ## The Win-in-Advance™ Approach
 
       **#{TEAM[:name]}** has spent **#{TEAM[:years_experience]} years** protecting commercial
-      policyholders alongside **#{LEGAL_PARTNER[:name]}** — #{LEGAL_PARTNER[:tagline]}.
+      policyholders and is a published expert on storm damage (*Roofing Contractor Magazine*).
+      He works alongside **#{LEGAL_PARTNER[:name]}** — #{LEGAL_PARTNER[:tagline]}, as seen in
+      #{LEGAL_PARTNER[:media].first(4).join(', ')}, and others.
 
-      Together, the team has documented recoveries averaging **up to #{LEGAL_PARTNER[:avg_return]}
-      more than the carrier's initial offer** — a Voss Law published figure.
+      Voss Law's published benchmark: clients recover **up to #{LEGAL_PARTNER[:avg_return]}
+      more** than the carrier's initial offer once legal representation is in place.
 
       #{TEAM[:company]}'s process is built around one principle: **present a claim so completely
       that the carrier's only rational response is full payment.**
@@ -211,6 +237,12 @@ class ReportTemplateService
       | **Public Adjuster Management** | Licensed PAs prepare and present the claim in the carrier's own language |
       | **Legal Representation** | #{LEGAL_PARTNER[:name]} — #{LEGAL_PARTNER[:fee]} — applies the legal pressure that changes outcomes |
       | **Restoration** | Licensed GC team executes the project from permit to warranty |
+
+      **If the carrier disputes, the Voss Law case cycle takes over:**
+
+      | Step | Action |
+      |---|---|
+      #{LEGAL_PARTNER[:case_cycle].map { |s| "| **#{s[:stage]}** | #{s[:detail]} |" }.join("\n      ")}
 
       When carriers push back, Voss Law's published track record includes:
 
@@ -371,17 +403,28 @@ class ReportTemplateService
       ## About the Team
 
       **#{TEAM[:name]}** has spent **#{TEAM[:years_experience]} years** protecting commercial
-      policyholders alongside **#{LEGAL_PARTNER[:name]}** — #{LEGAL_PARTNER[:tagline]}.
+      policyholders and is a published expert on storm damage (*Roofing Contractor Magazine*).
+
+      He works alongside **#{LEGAL_PARTNER[:name]}** — #{LEGAL_PARTNER[:tagline]}.
+
+      > *As seen in: #{LEGAL_PARTNER[:media].join(' · ')}*
+      > *Recognized by: #{LEGAL_PARTNER[:awards].first(3).join(' · ')}*
 
       Voss Law publishes this benchmark: clients recover **up to #{LEGAL_PARTNER[:avg_return]}
-      more** than what the carrier offered before retaining legal representation.
+      more** than the carrier's initial offer once legal representation is in place.
 
       #{TEAM[:company]} brings a complete recovery team to every large-loss claim:
 
       - **Licensed Engineers** — forensic analysis, stamped causation reports
       - **Certified Public Adjusters** — licensed claim preparation and carrier negotiation
-      - **#{LEGAL_PARTNER[:name]}** — legal representation when carriers dispute or delay; #{LEGAL_PARTNER[:fee]}
+      - **#{LEGAL_PARTNER[:name]}** — #{LEGAL_PARTNER[:fee]}
       - **General Contractor** — licensed restoration execution from permit to warranty
+
+      **If the carrier disputes, the Voss Law 5-stage case cycle takes over:**
+
+      | Step | Action |
+      |---|---|
+      #{LEGAL_PARTNER[:case_cycle].map { |s| "| **#{s[:stage]}** | #{s[:detail]} |" }.join("\n      ")}
 
       Voss Law's published "First Offer vs. Settlement Actuals":
 
