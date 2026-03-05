@@ -1,4 +1,7 @@
 FirstApp::Application.routes.draw do
+  # Render health check
+  get '/up', to: proc { [200, {}, ['OK']] }
+
   root 'pipeline#index'
 
   # Pipeline status dashboard
