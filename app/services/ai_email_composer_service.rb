@@ -31,8 +31,8 @@ class AiEmailComposerService
     - Conversational: no "I hope this finds you well", no "please don't hesitate", no passive voice
     - One ask: click the report link. Not "call us", not "let's discuss" — read the report first.
 
-    Close with: Amy on our team will reach out to schedule a 20-minute call. CC: amy@restorationgc.net
-    Signature: Michael Johnson | (512) 621-4201 | michael@restorationgc.net
+    Close with: Amy on our team will reach out to schedule a 20-minute call. CC: amy@rgcroof.com
+    Signature: Michael Johnson | (512) 621-4201 | michael@rgcroof.com
 
     Output ONLY the plain-text email body. Start with "Hi [FirstName]," — no subject line, no headers.
   SYSTEM
@@ -88,7 +88,7 @@ class AiEmailComposerService
     - One clear ask per email: either read the report OR book a call (not both)
     - Never mention "just following up" or "circling back" — those are banned phrases
 
-    Signature: Amy | Restoration GC | amy@restorationgc.net | CC: michael@restorationgc.net
+    Signature: Amy | Restoration GC | amy@rgcroof.com | CC: michael@rgcroof.com
 
     Output ONLY the plain-text email body. Start with "Hi [FirstName],"
   SYSTEM

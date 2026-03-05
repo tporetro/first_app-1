@@ -18,8 +18,8 @@ class ReportTemplateService
     name:             'Michael Johnson',
     title:            'Director of Commercial Services',
     phone:            '(512) 621-4201',
-    email:            'michael@restorationgc.net',
-    amy:              'amy@restorationgc.net',
+    email:            'michael@rgcroof.com',
+    amy:              'amy@rgcroof.com',
     company:          'Restoration GC',
     years_experience: 22
   }.freeze

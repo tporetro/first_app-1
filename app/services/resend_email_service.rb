@@ -4,11 +4,14 @@ require 'json'
 
 # Phase 5 — Email Outreach via Resend API.
 # Sends personalized storm damage outreach with Gamma report link.
-# CC's amy@restorationgc.net for follow-up scheduling.
+# FROM: michael@mail.rgcroof.com (subdomain absorbs deliverability risk)
+# REPLY_TO: michael@rgcroof.com (root domain — clean, professional, what prospects see)
+# CC: amy@mail.rgcroof.com
 class ResendEmailService
-  API_URL = 'https://api.resend.com/emails'.freeze
-  FROM    = 'Michael Johnson <michael@restorationgc.net>'.freeze
-  CC      = ['amy@restorationgc.net'].freeze
+  API_URL   = 'https://api.resend.com/emails'.freeze
+  FROM      = 'Michael Johnson <michael@mail.rgcroof.com>'.freeze
+  REPLY_TO  = 'michael@rgcroof.com'.freeze
+  CC        = ['amy@mail.rgcroof.com'].freeze
 
   SENDER_NAME    = 'Michael Johnson'.freeze
   SENDER_TITLE   = 'Director of Commercial Services'.freeze
@@ -23,12 +26,13 @@ class ResendEmailService
 
     html = body_html || plain_to_html(body_text)
     payload = {
-      from:    FROM,
-      to:      Array(to),
-      cc:      CC,
-      subject: subject,
-      html:    html,
-      text:    body_text
+      from:     FROM,
+      reply_to: REPLY_TO,
+      to:       Array(to),
+      cc:       CC,
+      subject:  subject,
+      html:     html,
+      text:     body_text
     }
 
     response = post_json(payload, api_key)
@@ -50,11 +54,12 @@ class ResendEmailService
     html    = build_html(lead, report_url, variant: variant)
 
     payload = {
-      from:    FROM,
-      to:      Array(to),
-      cc:      CC,
-      subject: subject,
-      html:    html
+      from:     FROM,
+      reply_to: REPLY_TO,
+      to:       Array(to),
+      cc:       CC,
+      subject:  subject,
+      html:     html
     }
 
     response = post_json(payload, api_key)

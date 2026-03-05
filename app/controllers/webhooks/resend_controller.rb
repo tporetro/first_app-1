@@ -66,7 +66,7 @@ module Webhooks
     end
 
     # POST /webhooks/resend/inbound — reply detection
-    # Resend inbound routing → POST here when amy@restorationgc.net receives a reply
+    # Resend inbound routing → POST here when amy@rgcroof.com or michael@rgcroof.com receives a reply
     def inbound
       payload = JSON.parse(request.body.read)
       sender  = payload['from'] || payload['sender']
