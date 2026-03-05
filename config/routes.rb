@@ -3,6 +3,7 @@ FirstApp::Application.routes.draw do
   get '/up', to: proc { [200, {}, ['OK']] }
 
   root 'pipeline#index'
+  get '/admin/seed_demo', to: 'admin#seed_demo'
 
   # Pipeline status dashboard
   resources :pipeline, only: [:index, :show] do
