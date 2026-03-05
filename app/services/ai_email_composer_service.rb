@@ -61,6 +61,153 @@ class AiEmailComposerService
     raise
   end
 
+  # ---------------------------------------------------------------------------
+  # Intelligent follow-up composer
+  #
+  # Claude reads the full engagement history and reasons about what to write —
+  # not a template. Each follow-up is different based on:
+  #   - Which day it is (3 / 7 / 14 / 21)
+  #   - Whether they opened the initial email
+  #   - Whether they clicked the report link
+  #   - Whether they've already received prior follow-ups
+  #   - The original subject line and property context
+  #
+  # After Day 3, the CTA shifts from "read the report" to "book a call."
+  # ---------------------------------------------------------------------------
+  FOLLOWUP_SYSTEM_PROMPT = <<~SYSTEM.freeze
+    You are Amy, scheduling coordinator at Restoration GC — an Austin-based commercial storm
+    damage contractor with licensed engineers, certified public adjusters, and insurance attorneys.
+
+    Michael Johnson sent the initial outreach. Your job is to follow up on his behalf.
+    Your emails are:
+    - SHORT (100 words max — shorter than the initial email)
+    - Conversational and human — not corporate
+    - Adapted to the contact's behavior: if they opened, acknowledge the report exists without
+      saying you know they opened it. If they clicked, the value is proven — push toward a call.
+      If they haven't engaged at all, try a completely different angle or question.
+    - One clear ask per email: either read the report OR book a call (not both)
+    - Never mention "just following up" or "circling back" — those are banned phrases
+
+    Signature: Amy | Restoration GC | amy@restorationgc.net | CC: michael@restorationgc.net
+
+    Output ONLY the plain-text email body. Start with "Hi [FirstName],"
+  SYSTEM
+
+  # engagement: { opened: bool, clicked: bool, open_count: int, prior_followups: int }
+  def self.compose_followup(lead:, report_url:, day:, engagement:, variant: 'a')
+    client = Anthropic::Client.new(api_key: ENV['ANTHROPIC_API_KEY'])
+
+    prompt  = build_followup_prompt(lead, report_url, day, engagement)
+    message = client.messages.create(
+      model:      MODEL,
+      max_tokens: 400,
+      thinking:   { type: 'adaptive' },
+      system:     FOLLOWUP_SYSTEM_PROMPT,
+      messages:   [{ role: 'user', content: prompt }]
+    )
+
+    body    = extract_text(message)
+    subject = compose_followup_subject(lead, day, engagement, variant)
+
+    { subject: subject, body: body, variant: variant }
+  rescue StandardError => e
+    Rails.logger.error "Followup composition failed (Day #{day}): #{e.message}"
+    raise
+  end
+
+  private_class_method def self.build_followup_prompt(lead, report_url, day, engagement)
+    first_name     = lead[:human_owner_name]&.split&.first || 'there'
+    company        = lead[:parent_company] || lead[:owner_entity]
+    hail_size      = lead[:hail_size]
+    storm_date     = lead[:storm_date]
+    claim_deadline = lead[:claim_deadline]
+    property_count = lead[:property_count] || 1
+    total_recovery = lead[:total_recovery]
+    calendly_url   = ENV['CALENDLY_URL'] || 'https://calendly.com/restorationgc/20min'
+
+    opened       = engagement[:opened]
+    clicked      = engagement[:clicked]
+    open_count   = engagement[:open_count].to_i
+    prior_count  = engagement[:prior_followups].to_i
+
+    # Describe engagement honestly for Claude's reasoning
+    engagement_desc = if clicked
+      "The contact CLICKED the report link — they engaged with the content. High intent signal."
+    elsif opened && open_count >= 2
+      "The contact opened the email #{open_count} times but has not clicked the report. Clearly interested but may need a nudge."
+    elsif opened
+      "The contact opened the email once but did not click the report link."
+    else
+      "The contact has not opened the email. The initial email and #{prior_count} prior follow-up(s) got no engagement."
+    end
+
+    # Define the strategic goal for Claude
+    strategy = if clicked
+      "They clicked the report. The next step is booking a call. Make it easy and low-commitment — 20 minutes, no pitch, just to walk them through the findings. Use this Calendly link: #{calendly_url}"
+    elsif day >= 14
+      "This is a late-stage follow-up. Be direct. The filing window closes #{claim_deadline}. Offer the Calendly link as a low-friction option: #{calendly_url}. This may be the last touchpoint."
+    elsif day == 7 && opened
+      "They looked but didn't act. Try a different angle — ask a question about the property or their current insurance situation. Don't just resend the report link; make them want to respond."
+    elsif !opened && prior_count >= 1
+      "No engagement at all after #{prior_count} attempts. Try a completely different subject line angle. Consider asking a single question to elicit a reply rather than pushing the report."
+    else
+      "Reinforce the value of the report. The ask is: click the link and read it. Keep it very short. #{report_url}"
+    end
+
+    property_context = property_count > 1 ?
+      "#{property_count} properties, total estimated recovery #{total_recovery}" :
+      "#{lead[:address]}, #{lead[:county]} County"
+
+    <<~PROMPT
+      Write a follow-up email. This is Day #{day} of the Amy follow-up cadence.
+
+      RECIPIENT: #{first_name}#{company.present? ? ", #{company}" : ''}
+      STORM: #{hail_size}" hail on #{storm_date}
+      PROPERTY: #{property_context}
+      FILING DEADLINE: #{claim_deadline}
+      REPORT: #{report_url}
+
+      ENGAGEMENT HISTORY: #{engagement_desc}
+
+      STRATEGIC GOAL FOR THIS EMAIL: #{strategy}
+
+      CONSTRAINTS:
+      - 100 words max
+      - Never say "just following up", "circling back", "hope this finds you well"
+      - One ask only
+      - Human and direct
+    PROMPT
+  end
+
+  private_class_method def self.compose_followup_subject(lead, day, engagement, variant)
+    first_name     = lead[:human_owner_name]&.split&.first
+    claim_deadline = lead[:claim_deadline]
+    property_count = lead[:property_count] || 1
+    total_recovery = lead[:total_recovery]
+    hail_size      = lead[:hail_size]
+
+    if engagement[:clicked]
+      "#{first_name ? "#{first_name} — " : ''}Ready to walk through the findings?"
+    elsif engagement[:opened] && day <= 7
+      "#{first_name ? "#{first_name}: " : ''}One question about #{lead[:address] || 'your property'}"
+    elsif day >= 14
+      "Filing deadline: #{claim_deadline} — #{property_count > 1 ? lead[:owner_entity] : lead[:address]}"
+    elsif day == 21
+      property_count > 1 ?
+        "#{total_recovery} — final notice before claim window closes" :
+        "Last notice: #{lead[:address]} claim window closes #{claim_deadline}"
+    else
+      # Rotate subject angles by variant + day to avoid repetition
+      angles = [
+        "Re: #{lead[:address] || lead[:owner_entity]}",
+        "#{hail_size}\" storm — #{first_name ? "#{first_name}, " : ''}did you see the report?",
+        "Quick question about your #{property_count > 1 ? 'portfolio' : 'property'}",
+        "#{first_name}: #{claim_deadline} filing deadline"
+      ]
+      angles[(day + variant.ord) % angles.size]
+    end
+  end
+
   # Batch compose for multiple leads using Claude's Batches API to reduce cost.
   # Returns array of { lead:, subject:, body:, variant: }.
   def self.batch_compose(leads_with_variants:, report_urls:)

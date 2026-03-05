@@ -70,17 +70,27 @@ class StormPipelineService
     log "=== Amy Follow-Up Scheduler ==="
 
     FOLLOWUP_DAYS.each do |day|
+      # Find initial outreaches (followup_day: 0) sent exactly `day` days ago,
+      # where no reply has been received on any follow-up in the thread.
       due = EmailOutreach
         .joins(:email_campaign)
         .where(followup_day: 0, status: 'sent')
         .where(
-          "email_outreaches.sent_at <= ? AND email_outreaches.sent_at > ?",
+          "email_outreaches.sent_at >= ? AND email_outreaches.sent_at <= ?",
           day.days.ago.beginning_of_day,
           day.days.ago.end_of_day
         )
         .where(email_campaigns: { replied_at: nil })
 
       due.each do |outreach|
+        # Skip if already sent this follow-up day for this outreach thread
+        already_sent = EmailOutreach.where(
+          property:     outreach.property,
+          contact:      outreach.contact,
+          followup_day: day
+        ).exists?
+        next if already_sent
+
         send_followup(outreach, day)
       end
     end
@@ -346,28 +356,79 @@ class StormPipelineService
     contact = original_outreach.contact
     return unless contact&.owner_email
 
-    lead_data = build_lead_data(original_outreach.property, contact)
-    result = ResendEmailService.send_outreach(
-      to:         contact.owner_email,
-      lead:       lead_data.merge(followup_day: day),
-      report_url: original_outreach.gamma_report&.gamma_url || '#',
-      variant:    original_outreach.email_campaign&.variant || 'a'
-    )
+    report_url = original_outreach.gamma_report&.gamma_url || '#'
+    variant    = original_outreach.email_campaign&.variant || 'a'
+    campaign   = original_outreach.email_campaign
 
-    EmailOutreach.create!(
+    # Build engagement context so Claude can reason about what to write
+    prior_followups = EmailOutreach.where(
       property:     original_outreach.property,
       contact:      contact,
-      gamma_report: original_outreach.gamma_report,
-      subject:      "Follow-up (Day #{day}): #{original_outreach.subject}",
-      body:         '',
+      followup_day: 1..20
+    ).count
+
+    engagement = {
+      opened:          campaign&.opened_at.present?,
+      clicked:         campaign&.clicked_at.present?,
+      open_count:      campaign&.opened_at.present? ? 1 : 0,  # Resend basic tracking
+      prior_followups: prior_followups
+    }
+
+    lead_data = build_portfolio_lead_data(
+      storm:      original_outreach.property.storm_event,
+      properties: contact.storm_event.properties.where(owner_entity: contact.owner_entity).to_a,
+      contact:    contact
+    )
+
+    log "Follow-up Day #{day} — #{contact.owner_entity} | opened=#{engagement[:opened]} clicked=#{engagement[:clicked]}"
+
+    # Claude composes an engagement-aware follow-up (different from the initial email)
+    composed = AiEmailComposerService.compose_followup(
+      lead:       lead_data,
+      report_url: report_url,
+      day:        day,
+      engagement: engagement,
+      variant:    variant
+    )
+
+    result = ResendEmailService.send_composed(
+      to:        contact.owner_email,
+      subject:   composed[:subject],
+      body_text: composed[:body]
+    )
+
+    outreach = EmailOutreach.create!(
+      property:      original_outreach.property,
+      contact:       contact,
+      gamma_report:  original_outreach.gamma_report,
+      subject:       composed[:subject],
+      body:          composed[:body],
       sent_to_email: contact.owner_email,
-      status:       result[:success] ? 'sent' : 'failed',
-      sent_at:      result[:success] ? Time.now : nil,
-      followup_day: day,
+      status:        result[:success] ? 'sent' : 'failed',
+      sent_at:       result[:success] ? Time.now : nil,
+      followup_day:  day,
       error_message: result[:error]
     )
 
-    log "Follow-up Day #{day} sent to #{contact.owner_email}" if result[:success]
+    if result[:success]
+      EmailCampaign.create!(
+        email_outreach:     outreach,
+        mailgun_message_id: result[:message_id],
+        owner_name:         contact.human_owner_name,
+        address:            original_outreach.property.address,
+        variant:            variant,
+        status:             'sent'
+      )
+
+      engagement_label = engagement[:clicked] ? 'CLICKED' : engagement[:opened] ? 'opened' : 'no-open'
+      PushoverService.notify(
+        title: "Follow-up Day #{day} Sent",
+        message: "#{contact.human_owner_name} (#{engagement_label}) — #{original_outreach.property.address}"
+      )
+      log "Follow-up Day #{day} sent to #{contact.owner_email} [#{engagement_label}]"
+    else
+      log "Follow-up Day #{day} FAILED for #{contact.owner_email}: #{result[:error]}"
+    end
   end
 
   def self.persist_storm(storm_data)
