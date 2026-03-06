@@ -3,7 +3,8 @@ require 'anthropic'
 # Intelligent multi-source contact enrichment.
 #
 # Cascade strategy:
-#   1. Claude + web search (primary — finds domain, owner name, validates)
+#   0. PropStream (deed-verified owner name + skip-trace phone/email from property records)
+#   1. Claude + web search (primary — finds domain, validates, supplements PropStream)
 #   2. Clay (enriches with verified email/phone/LinkedIn using domain from web search)
 #   3. Secretary of State registered agent (fallback for LLCs with no web presence)
 #
@@ -25,6 +26,25 @@ class SmartEnrichmentService
   def self.enrich(owner_entity:, address: nil, state: nil)
     result = {}
     sources_used = []
+
+    # --- Step 0: PropStream (deed records + optional skip trace) ---
+    if address.present?
+      city, zip = parse_city_zip(address)
+      ps_data = PropStreamService.lookup(
+        address:    address,
+        city:       city,
+        state:      state,
+        zip:        zip,
+        skip_trace: true
+      )
+      if ps_data
+        result[:human_owner_name] = ps_data.owner_name       if ps_data.owner_name.present?
+        result[:owner_email]      = ps_data.owner_email      if ps_data.owner_email.present?
+        result[:owner_phone]      = ps_data.owner_phone      if ps_data.owner_phone.present?
+        sources_used << 'propstream'
+        Rails.logger.info "Enrichment: PropStream found #{ps_data.owner_name} for #{owner_entity} @ #{address}"
+      end
+    end
 
     # --- Step 1: Claude web search (primary — finds domain, owner name, validates) ---
     web_data = claude_web_enrich(
@@ -186,6 +206,15 @@ class SmartEnrichmentService
       owner_linkedin:   0.05
     }
     weights.sum { |field, weight| data[field].present? ? weight : 0 }
+  end
+
+  # Extract city and ZIP from a free-form address string.
+  # e.g. "123 Main St, Dallas, TX 75201" → ["Dallas", "75201"]
+  def self.parse_city_zip(address)
+    return [nil, nil] if address.blank?
+    zip  = address.match(/\b(\d{5})\b/)&.captures&.first
+    city = address.match(/,\s*([^,]+),\s*[A-Z]{2}\s+\d{5}/)&.captures&.first
+    [city&.strip, zip]
   end
 
   def self.build_notes(data, confidence, sources)
