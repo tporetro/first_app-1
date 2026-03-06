@@ -44,7 +44,18 @@ class SmartEnrichmentService
       Rails.logger.info "Enrichment: PDL found #{pdl_data.human_owner_name} / #{pdl_data.owner_email} for #{owner_entity}"
     end
 
-    # --- Step 2: Clay (verifies email/phone/LinkedIn) ---
+    # --- Step 2: Secretary of State (free scraper — registered agent / principal) ---
+    if result[:human_owner_name].blank? && state
+      sos_data = SecretaryOfStateService.lookup(owner_entity: owner_entity, state: state)
+      if sos_data
+        result[:human_owner_name] = sos_data.human_owner_name if sos_data.human_owner_name.present?
+        result[:owner_title]      = sos_data.owner_title      if sos_data.owner_title.present? && result[:owner_title].blank?
+        sources_used << 'secretary_of_state'
+        Rails.logger.info "Enrichment: SoS found #{sos_data.human_owner_name} for #{owner_entity}"
+      end
+    end
+
+    # --- Step 3: Clay (verifies email/phone/LinkedIn) ---
     clay_data = ClayEnrichmentService.enrich(
       owner_entity: owner_entity,
       address:      address,
