@@ -29,4 +29,14 @@ class PipelineController < ApplicationController
     redirect_to pipeline_index_path,
       notice: 'Pipeline job enqueued. Storms will appear here as they are detected and processed.'
   end
+
+  # POST /pipeline/test_run — runs a full end-to-end test, routing email to test_email.
+  def test_run
+    email = params[:test_email].presence
+    return redirect_to(pipeline_index_path, alert: 'test_email param required') unless email
+
+    PipelineTestRunJob.perform_async(email)
+    redirect_to pipeline_index_path,
+      notice: "Test run enqueued → email will arrive at #{email}. Watch Pushover for phase updates."
+  end
 end

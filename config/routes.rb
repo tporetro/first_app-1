@@ -7,7 +7,10 @@ FirstApp::Application.routes.draw do
 
   # Pipeline status dashboard
   resources :pipeline, only: [:index, :show] do
-    collection { post :trigger }
+    collection do
+      post :trigger
+      post :test_run
+    end
     resources :reports, only: [:index]
   end
 
