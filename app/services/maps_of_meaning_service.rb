@@ -152,7 +152,7 @@ class MapsOfMeaningService
       Return only the JSON object, no other text.
     PROMPT
 
-    response = client.messages(
+    response = client.messages.create(
       model:      'claude-opus-4-6',
       max_tokens: 1024,
       messages:   [{

@@ -6,7 +6,7 @@ require 'json'
 # Searches for owner/principal contacts by company name.
 # POST https://api.apollo.io/v1/mixed_people/search
 class ApolloService
-  API_URL = 'https://api.apollo.io/v1/mixed_people/search'.freeze
+  API_URL = 'https://api.apollo.io/api/v1/mixed_people/search'.freeze
 
   ENRICHED_FIELDS = %i[
     human_owner_name owner_title owner_email
@@ -53,6 +53,8 @@ class ApolloService
     uri  = URI.parse(url)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
+    http.open_timeout = 10
+    http.read_timeout = 20
 
     request = Net::HTTP::Post.new(uri.path)
     request['Content-Type'] = 'application/json'
@@ -60,6 +62,10 @@ class ApolloService
     request.body = payload.to_json
 
     response = http.request(request)
-    JSON.parse(response.body) if response.is_a?(Net::HTTPSuccess)
+    unless response.is_a?(Net::HTTPSuccess)
+      Rails.logger.warn "Apollo API #{response.code}: #{response.body.truncate(200)}"
+      return nil
+    end
+    JSON.parse(response.body)
   end
 end

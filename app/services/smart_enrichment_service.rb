@@ -26,12 +26,12 @@ class SmartEnrichmentService
     result = {}
     sources_used = []
 
-    # --- Step 1: Clay (primary — waterfalls through 50+ providers with email verification) ---
-    clay_data = ClayEnrichmentService.enrich(owner_entity: owner_entity, address: address, state: state)
-    if clay_data
-      result.merge!(clay_data)
-      sources_used << 'clay'
-      Rails.logger.info "Enrichment: Clay found #{clay_data[:human_owner_name]} for #{owner_entity}"
+    # --- Step 1: Apollo (primary — people search across 275M+ contacts with email verification) ---
+    apollo_data = ApolloService.enrich(owner_entity: owner_entity)
+    if apollo_data
+      result.merge!(apollo_data)
+      sources_used << 'apollo'
+      Rails.logger.info "Enrichment: Apollo found #{apollo_data[:human_owner_name]} for #{owner_entity}"
     end
 
     # --- Step 2: Claude web search (always runs — fills gaps and validates Apollo) ---
@@ -83,6 +83,8 @@ class SmartEnrichmentService
   private
 
   # Claude with web search — finds, validates, and cross-references contact info
+  WEB_SEARCH_TIMEOUT = 120 # seconds — web search can do multiple rounds
+
   def self.claude_web_enrich(owner_entity:, address:, state:, existing:)
     client = Anthropic::Client.new(api_key: ENV['ANTHROPIC_API_KEY'])
 
@@ -111,15 +113,17 @@ class SmartEnrichmentService
       Use null for any field you cannot verify with reasonable confidence.
     PROMPT
 
-    message = client.messages.create(
-      model: MODEL,
-      max_tokens: 1024,
-      tools: [
-        { type: 'web_search_20260209', name: 'web_search' }
-      ],
-      system: 'You are a B2B contact researcher. Find verified contact information for commercial real estate decision-makers. Return only confirmed facts as JSON.',
-      messages: [{ role: 'user', content: prompt }]
-    )
+    message = Timeout.timeout(WEB_SEARCH_TIMEOUT) do
+      client.messages.create(
+        model: MODEL,
+        max_tokens: 4096,
+        tools: [
+          { type: 'web_search_20260209', name: 'web_search' }
+        ],
+        system: 'You are a B2B contact researcher. Find verified contact information for commercial real estate decision-makers. Return only confirmed facts as JSON.',
+        messages: [{ role: 'user', content: prompt }]
+      )
+    end
 
     text = message.content.select { |b| b.type == 'text' }.map(&:text).join
     json_match = text.match(/\{[\s\S]*?\}/)
@@ -127,31 +131,41 @@ class SmartEnrichmentService
 
     JSON.parse(json_match[0], symbolize_names: true)
       .transform_values { |v| v.presence }
+  rescue Timeout::Error
+    Rails.logger.warn "Claude web enrichment timed out after #{WEB_SEARCH_TIMEOUT}s for #{owner_entity}"
+    nil
   rescue StandardError => e
     Rails.logger.error "Claude web enrichment failed: #{e.message}"
     nil
   end
 
+  SOS_TIMEOUT = 60 # seconds
+
   # Quick lookup using Claude + web search targeting state SOS databases
   def self.secretary_of_state_lookup(owner_entity:, state:)
     client = Anthropic::Client.new(api_key: ENV['ANTHROPIC_API_KEY'])
 
-    message = client.messages.create(
-      model: MODEL,
-      max_tokens: 256,
-      tools: [{ type: 'web_search_20260209', name: 'web_search' }],
-      system: 'You look up registered agent and principal information from state Secretary of State records.',
-      messages: [{
-        role: 'user',
-        content: "Search the #{state} Secretary of State database for the registered agent or principal of '#{owner_entity}'. Return a JSON object with: human_owner_name, owner_title, owner_email (if available), owner_phone (if available). Use null for unknown fields."
-      }]
-    )
+    message = Timeout.timeout(SOS_TIMEOUT) do
+      client.messages.create(
+        model: MODEL,
+        max_tokens: 1024,
+        tools: [{ type: 'web_search_20260209', name: 'web_search' }],
+        system: 'You look up registered agent and principal information from state Secretary of State records.',
+        messages: [{
+          role: 'user',
+          content: "Search the #{state} Secretary of State database for the registered agent or principal of '#{owner_entity}'. Return a JSON object with: human_owner_name, owner_title, owner_email (if available), owner_phone (if available). Use null for unknown fields."
+        }]
+      )
+    end
 
     text = message.content.select { |b| b.type == 'text' }.map(&:text).join
     json_match = text.match(/\{[\s\S]*?\}/)
     return nil unless json_match
 
     JSON.parse(json_match[0], symbolize_names: true).transform_values(&:presence)
+  rescue Timeout::Error
+    Rails.logger.warn "SoS lookup timed out after #{SOS_TIMEOUT}s for #{owner_entity}"
+    nil
   rescue StandardError
     nil
   end

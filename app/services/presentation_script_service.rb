@@ -58,7 +58,7 @@ class PresentationScriptService
   def self.compose_script(lead)
     client = Anthropic::Client.new(api_key: ENV['ANTHROPIC_API_KEY'])
 
-    response = client.messages(
+    response = client.messages.create(
       model:      'claude-opus-4-6',
       max_tokens: 4096,
       messages:   [{ role: 'user', content: build_prompt(lead) }]
