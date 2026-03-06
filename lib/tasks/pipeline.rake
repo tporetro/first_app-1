@@ -167,6 +167,112 @@ end
 
 namespace :pipeline do
   # ---------------------------------------------------------------------------
+  # End-to-end test run — real enrichment, real Gamma report, email to you
+  # Usage: rake pipeline:test_run[you@example.com]
+  # ---------------------------------------------------------------------------
+  desc 'Full pipeline test: seeds a storm+property, runs enrichment→report→email to TEST_EMAIL'
+  task :test_run, [:test_email] => :environment do |_, args|
+    test_email = args[:test_email]
+    unless test_email
+      puts "ERROR: Provide a test email: rake pipeline:test_run[you@example.com]"
+      next
+    end
+
+    puts "[TEST] Starting end-to-end pipeline test"
+    puts "[TEST] Outreach email will be routed to: #{test_email}"
+    puts ""
+
+    # 1. Seed a test storm
+    storm = StormEvent.create!(
+      name:       "TEST Dallas #{Date.today.strftime('%Y-%m-%d')}",
+      event_date: Date.yesterday,
+      hail_size:  2.0,
+      counties:   "Dallas",
+      state:      "TX",
+      metro_area: "Dallas",
+      status:     "detected",
+      notes:      "TEST RUN — created by pipeline:test_run. Safe to delete."
+    )
+    puts "[TEST] Storm created: #{storm.name} (id=#{storm.id})"
+
+    # 2. Seed 1 real commercial property (identified, ready for enrichment)
+    property = storm.properties.create!(
+      address:       "6100 LBJ Freeway",
+      city:          "Dallas",
+      state:         "TX",
+      county:        "Dallas",
+      property_type: "Office",
+      sq_ft:         87_500,
+      roof_system:   "EPDM Membrane",
+      owner_entity:  "LBJ Office Partners LLC",
+      source:        "test",
+      status:        "identified"
+    )
+    puts "[TEST] Property seeded: #{property.address} (#{property.owner_entity})"
+    PushoverService.notify(title: "🧪 Test Run Started", message: "Storm + property seeded. Running Phase 3 enrichment...")
+
+    # 3. Enrich contact (real Clay + Claude enrichment)
+    puts ""
+    puts "[TEST] Phase 3: Enriching #{property.owner_entity}..."
+    result = SmartEnrichmentService.enrich(
+      owner_entity: property.owner_entity,
+      address:      property.address,
+      state:        property.state
+    )
+    puts "[TEST] Enriched: #{result.human_owner_name} | confidence #{(result.confidence * 100).round}% | source: #{result.enrichment_source}"
+
+    contact = storm.contacts.create!(
+      owner_entity:      property.owner_entity,
+      human_owner_name:  result.human_owner_name || "Test Owner",
+      owner_title:       result.owner_title,
+      owner_email:       test_email,   # route to test inbox, not real owner
+      owner_phone:       result.owner_phone,
+      owner_linkedin:    result.owner_linkedin,
+      parent_company:    result.parent_company,
+      org_domain:        result.org_domain,
+      enrichment_source: result.enrichment_source,
+      status:            "enriched"
+    )
+    puts "[TEST] Contact saved (email overridden → #{test_email})"
+    PushoverService.notify(
+      title: "✅ Phase 3 Done",
+      message: "#{result.human_owner_name} | #{(result.confidence * 100).round}% confidence | #{result.enrichment_source}"
+    )
+
+    # 4. Generate Gamma report
+    puts ""
+    puts "[TEST] Phase 4: Generating Gamma report..."
+    properties  = [property]
+    contacts    = [contact]
+    report_data = StormPipelineService.phase_4_generate_reports(storm, properties, contacts)
+    prop_count  = report_data[:property_reports].size
+    puts "[TEST] #{prop_count} report(s) generated"
+    PushoverService.notify(title: "✅ Phase 4 Done", message: "#{prop_count} Gamma report(s) generated")
+
+    # 5. Generate presentation script
+    puts ""
+    puts "[TEST] Phase 5: Generating presentation script..."
+    scripts = StormPipelineService.phase_5_generate_scripts(storm, properties, contacts, report_data)
+    puts "[TEST] #{scripts.size} script(s) generated"
+    PushoverService.notify(title: "✅ Phase 5 Done", message: "#{scripts.size} presentation script(s) ready")
+
+    # 6. Send outreach email
+    puts ""
+    puts "[TEST] Phase 6: Sending outreach email to #{test_email}..."
+    sent = StormPipelineService.phase_6_send_outreach(properties, contacts, report_data)
+    puts "[TEST] #{sent} email(s) sent"
+    PushoverService.notify(
+      title: "✅ Test Run Complete",
+      message: "#{sent} email(s) sent to #{test_email} | Storm id=#{storm.id}"
+    )
+
+    puts ""
+    puts "[TEST] ✅ Done! Check your inbox: #{test_email}"
+    puts "[TEST]    Dashboard: /pipeline/#{storm.id}"
+    puts "[TEST]    To clean up: StormEvent.find(#{storm.id}).destroy"
+  end
+
+  # ---------------------------------------------------------------------------
   # Variant performance report
   # ---------------------------------------------------------------------------
   desc 'Print A/B/C/D variant performance for a storm (rake pipeline:variants[storm_id])'
