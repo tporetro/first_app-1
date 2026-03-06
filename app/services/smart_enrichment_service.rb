@@ -12,7 +12,8 @@ require 'anthropic'
 # Outputs a confidence score so the pipeline can decide whether to send immediately,
 # flag for manual review, or skip.
 class SmartEnrichmentService
-  MODEL = :"claude-haiku-4-5-20251001"
+  MODEL            = :"claude-haiku-4-5-20251001"  # cheap — used for non-search tasks
+  WEB_SEARCH_MODEL = :"claude-sonnet-4-6"          # required for web_search_20260209 tool
 
   MIN_CONFIDENCE_TO_SEND = 0.5  # Skip outreach below this threshold
 
@@ -112,7 +113,7 @@ class SmartEnrichmentService
   private
 
   # Claude with web search — finds, validates, and cross-references contact info
-  WEB_SEARCH_TIMEOUT = 120 # seconds — web search can do multiple rounds
+  WEB_SEARCH_TIMEOUT = 600 # seconds — Sonnet web search can take 5+ minutes with many search rounds
 
   def self.claude_web_enrich(owner_entity:, address:, state:, existing:)
     client = Anthropic::Client.new(api_key: ENV['ANTHROPIC_API_KEY'])
@@ -147,20 +148,13 @@ class SmartEnrichmentService
       Use null for any field you cannot verify with reasonable confidence.
     PROMPT
 
-    message = Timeout.timeout(WEB_SEARCH_TIMEOUT) do
-      client.messages.create(
-        model: MODEL,
-        max_tokens: 4096,
-        tools: [
-          { type: 'web_search_20260209', name: 'web_search' }
-        ],
-        system: 'You are a B2B contact researcher. Find verified contact information for commercial real estate decision-makers. Return only confirmed facts as JSON.',
-        messages: [{ role: 'user', content: prompt }]
-      )
+    text = Timeout.timeout(WEB_SEARCH_TIMEOUT) do
+      run_web_search_to_text(client, prompt)
     end
 
-    text = message.content.select { |b| b.type == 'text' }.map(&:text).join
-    json_match = text.match(/\{[\s\S]*?\}/)
+    return nil if text.blank?
+
+    json_match = text.match(/\{[\s\S]*\}/)
     return nil unless json_match
 
     JSON.parse(json_match[0], symbolize_names: true)
@@ -173,27 +167,21 @@ class SmartEnrichmentService
     nil
   end
 
-  SOS_TIMEOUT = 60 # seconds
+  SOS_TIMEOUT = 600 # seconds
 
   # Quick lookup using Claude + web search targeting state SOS databases
   def self.secretary_of_state_lookup(owner_entity:, state:)
     client = Anthropic::Client.new(api_key: ENV['ANTHROPIC_API_KEY'])
+    prompt = "Search the #{state} Secretary of State database for the registered agent or principal of '#{owner_entity}'. Return a JSON object with: human_owner_name, owner_title, owner_email (if available), owner_phone (if available). Use null for unknown fields."
 
-    message = Timeout.timeout(SOS_TIMEOUT) do
-      client.messages.create(
-        model: MODEL,
-        max_tokens: 1024,
-        tools: [{ type: 'web_search_20260209', name: 'web_search' }],
-        system: 'You look up registered agent and principal information from state Secretary of State records.',
-        messages: [{
-          role: 'user',
-          content: "Search the #{state} Secretary of State database for the registered agent or principal of '#{owner_entity}'. Return a JSON object with: human_owner_name, owner_title, owner_email (if available), owner_phone (if available). Use null for unknown fields."
-        }]
-      )
+    text = Timeout.timeout(SOS_TIMEOUT) do
+      run_web_search_to_text(client, prompt,
+        system: 'You look up registered agent and principal information from state Secretary of State records.')
     end
 
-    text = message.content.select { |b| b.type == 'text' }.map(&:text).join
-    json_match = text.match(/\{[\s\S]*?\}/)
+    return nil if text.blank?
+
+    json_match = text.match(/\{[\s\S]*\}/)
     return nil unless json_match
 
     JSON.parse(json_match[0], symbolize_names: true).transform_values(&:presence)
@@ -202,6 +190,21 @@ class SmartEnrichmentService
     nil
   rescue StandardError
     nil
+  end
+
+  # Executes a single web search request and extracts the text response.
+  # web_search_20260209 is server-side: Anthropic runs all searches in one
+  # call and returns end_turn with text as the last content block.
+  def self.run_web_search_to_text(client, user_prompt, system: 'You are a B2B contact researcher. Find verified contact information for commercial real estate decision-makers. Return only confirmed facts as JSON.')
+    resp = client.messages.create(
+      model:      WEB_SEARCH_MODEL,
+      max_tokens: 4096,
+      tools:      [{ type: 'web_search_20260209', name: 'web_search' }],
+      system:     system,
+      messages:   [{ role: 'user', content: user_prompt }]
+    )
+
+    resp.content.select { |b| b.type == 'text' }.map(&:text).join.presence
   end
 
   # Confidence score 0.0–1.0 based on how much usable data we found
