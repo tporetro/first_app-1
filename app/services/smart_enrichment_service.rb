@@ -11,7 +11,7 @@ require 'anthropic'
 # Outputs a confidence score so the pipeline can decide whether to send immediately,
 # flag for manual review, or skip.
 class SmartEnrichmentService
-  MODEL = :"claude-opus-4-6"
+  MODEL = :"claude-haiku-4-5-20251001"
 
   MIN_CONFIDENCE_TO_SEND = 0.5  # Skip outreach below this threshold
 
