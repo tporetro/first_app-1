@@ -3,10 +3,11 @@ require 'anthropic'
 # Intelligent multi-source contact enrichment.
 #
 # Cascade strategy:
-#   0. PropStream (deed-verified owner name + skip-trace phone/email from property records)
-#   1. Claude + web search (primary — finds domain, validates, supplements PropStream)
-#   2. Clay (enriches with verified email/phone/LinkedIn using domain from web search)
-#   3. Secretary of State registered agent (fallback for LLCs with no web presence)
+#   0. Corporation Wiki (free — officer name + title from public records, no API key)
+#   1. PropStream (deed-verified owner name + skip-trace phone/email from property records)
+#   2. Claude + web search (primary — finds domain, validates, supplements PropStream)
+#   3. Clay (enriches with verified email/phone/LinkedIn using domain from web search)
+#   4. Secretary of State registered agent (fallback for LLCs with no web presence)
 #
 # Outputs a confidence score so the pipeline can decide whether to send immediately,
 # flag for manual review, or skip.
@@ -27,7 +28,16 @@ class SmartEnrichmentService
     result = {}
     sources_used = []
 
-    # --- Step 0: PropStream (deed records + optional skip trace) ---
+    # --- Step 0a: Corporation Wiki (free — officer name + title, no API key) ---
+    cw_data = CorporationWikiService.lookup(owner_entity: owner_entity, state: state)
+    if cw_data
+      result[:human_owner_name] = cw_data.human_owner_name if cw_data.human_owner_name.present?
+      result[:owner_title]      = cw_data.owner_title      if cw_data.owner_title.present?
+      sources_used << 'corporation_wiki'
+      Rails.logger.info "Enrichment: Corporation Wiki found #{cw_data.human_owner_name} for #{owner_entity}"
+    end
+
+    # --- Step 0b: PropStream (deed records + optional skip trace) ---
     if address.present?
       city, zip = parse_city_zip(address)
       ps_data = PropStreamService.lookup(
