@@ -167,6 +167,43 @@ end
 
 namespace :pipeline do
   # ---------------------------------------------------------------------------
+  # Enrichment smoke test — runs real enrichment on a fixed set of commercial
+  # LLCs and prints a per-source breakdown so you can evaluate each step.
+  # Usage: rake pipeline:test_enrichment
+  # ---------------------------------------------------------------------------
+  TEST_ENTITIES = [
+    { owner_entity: "Prologis LP",                address: "1800 Wazee St",        state: "CO" },
+    { owner_entity: "Greystar Real Estate Partners LLC", address: "465 Meeting St", state: "SC" },
+    { owner_entity: "Cousins Properties LLC",     address: "3344 Peachtree Rd NE",  state: "GA" },
+    { owner_entity: "Highwoods Properties Inc",   address: "3100 Smoketree Ct",     state: "NC" },
+    { owner_entity: "Whitestone REIT",            address: "2600 S Gessner Rd",     state: "TX" },
+  ].freeze
+
+  desc 'Smoke-test SmartEnrichmentService on real commercial entities — prints per-source results'
+  task test_enrichment: :environment do
+    header = "%-40s %-20s %-30s %-12s %-18s" % %w[ENTITY NAME EMAIL SOURCE CONFIDENCE]
+    puts "\n#{"=" * 125}"
+    puts header
+    puts "=" * 125
+
+    TEST_ENTITIES.each do |e|
+      result = SmartEnrichmentService.enrich(**e)
+
+      name       = (result.human_owner_name || "—")[0, 20]
+      email      = (result.owner_email      || "—")[0, 30]
+      source     = result.enrichment_source || "none"
+      confidence = "#{(result.confidence * 100).round}%"
+
+      puts "%-40s %-20s %-30s %-12s %-18s" % [e[:owner_entity][0, 40], name, email, source, confidence]
+      puts "  notes: #{result.notes}" if result.notes.present?
+      puts
+    end
+
+    puts "=" * 125
+    puts "\nDone. Review which sources are actually filling fields vs returning nil."
+  end
+
+  # ---------------------------------------------------------------------------
   # End-to-end test run — real enrichment, real Gamma report, email to you
   # Usage: rake pipeline:test_run[you@example.com]
   # ---------------------------------------------------------------------------
