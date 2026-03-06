@@ -17,18 +17,23 @@ class ClayEnrichmentService
   # Clay's "Company Enrichment" API — finds company info, domain, parent company
   COMPANY_API_URL = 'https://api.clay.com/v1/enrichments/companies'.freeze
 
-  def self.enrich(owner_entity:, address: nil, state: nil)
+  def self.enrich(owner_entity:, address: nil, state: nil, domain: nil)
     api_key = ENV['CLAY_API_KEY']
     raise 'CLAY_API_KEY not set' unless api_key
 
-    # Step 1: Company enrichment to find domain and parent company
-    company_data = enrich_company(owner_entity: owner_entity, api_key: api_key)
+    # Step 1: Company enrichment to find domain and parent company.
+    # Skip if domain is already known (passed in from web search).
+    company_data = if domain.present?
+      { org_domain: domain }
+    else
+      enrich_company(owner_entity: owner_entity, api_key: api_key)
+    end
 
     # Step 2: People enrichment to find decision-maker using company context
-    domain = company_data&.dig(:org_domain)
+    resolved_domain = domain.presence || company_data&.dig(:org_domain)
     people_data = enrich_person(
       company_name: owner_entity,
-      domain:       domain,
+      domain:       resolved_domain,
       api_key:      api_key,
       titles:       decision_maker_titles
     )

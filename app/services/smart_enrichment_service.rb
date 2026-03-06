@@ -3,8 +3,8 @@ require 'anthropic'
 # Intelligent multi-source contact enrichment.
 #
 # Cascade strategy:
-#   1. Clay (primary — waterfalls 50+ providers, verifies emails)
-#   2. Claude + web search (fills gaps, validates, finds what Clay misses)
+#   1. Claude + web search (primary — finds domain, owner name, validates)
+#   2. Clay (enriches with verified email/phone/LinkedIn using domain from web search)
 #   3. Secretary of State registered agent (fallback for LLCs with no web presence)
 #
 # Outputs a confidence score so the pipeline can decide whether to send immediately,
@@ -26,15 +26,7 @@ class SmartEnrichmentService
     result = {}
     sources_used = []
 
-    # --- Step 1: Clay (primary — waterfalls 50+ providers, verifies emails) ---
-    clay_data = ClayEnrichmentService.enrich(owner_entity: owner_entity, address: address, state: state)
-    if clay_data
-      result.merge!(clay_data)
-      sources_used << 'clay'
-      Rails.logger.info "Enrichment: Clay found #{clay_data[:human_owner_name]} for #{owner_entity}"
-    end
-
-    # --- Step 2: Claude web search (fills gaps and validates Clay) ---
+    # --- Step 1: Claude web search (primary — finds domain, owner name, validates) ---
     web_data = claude_web_enrich(
       owner_entity: owner_entity,
       address:      address,
@@ -43,11 +35,25 @@ class SmartEnrichmentService
     )
 
     if web_data
+      result.merge!(web_data.reject { |_, v| v.blank? })
+      sources_used << 'web_search'
+      Rails.logger.info "Enrichment: web search found #{web_data[:human_owner_name]} / #{web_data[:org_domain]} for #{owner_entity}"
+    end
+
+    # --- Step 2: Clay (verifies email/phone/LinkedIn, uses domain from web search) ---
+    clay_data = ClayEnrichmentService.enrich(
+      owner_entity: owner_entity,
+      address:      address,
+      state:        state,
+      domain:       result[:org_domain]
+    )
+    if clay_data
       %i[human_owner_name owner_title owner_email owner_phone owner_linkedin
          parent_company org_domain].each do |field|
-        result[field] = web_data[field] if web_data[field].present? && result[field].blank?
+        result[field] = clay_data[field] if clay_data[field].present? && result[field].blank?
       end
-      sources_used << 'web_search'
+      sources_used << 'clay'
+      Rails.logger.info "Enrichment: Clay supplemented #{clay_data.keys.select { |k| clay_data[k].present? }.join(', ')} for #{owner_entity}"
     end
 
     # --- Step 3: Secretary of State fallback for email ---
