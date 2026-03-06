@@ -7,7 +7,7 @@ require 'anthropic'
 # recent acquisitions, public statements — anything that makes the email
 # feel like it came from someone who did their homework.
 class ProspectResearchService
-  MODEL = :"claude-opus-4-6"
+  MODEL = "claude-opus-4-6"
 
   # Returns a research summary hash with keys:
   #   :company_context, :owner_context, :portfolio_context, :hook
