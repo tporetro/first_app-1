@@ -113,8 +113,7 @@ class SmartEnrichmentService
 
     message = client.messages.create(
       model: MODEL,
-      max_tokens: 512,
-      thinking: { type: 'adaptive' },
+      max_tokens: 1024,
       tools: [
         { type: 'web_search_20260209', name: 'web_search' }
       ],
