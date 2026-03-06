@@ -284,7 +284,7 @@ class StormPipelineService
     scripts
   end
 
-  def self.phase_6_send_outreach(properties, contacts, report_data)
+  def self.phase_6_send_outreach(properties, contacts, report_data, dry_run: false)
     property_reports  = report_data[:property_reports]
     portfolio_reports = report_data[:portfolio_reports]
     sent = 0
@@ -321,6 +321,16 @@ class StormPipelineService
         report_url: primary_report.gamma_url,
         variant:    variant
       )
+
+      if dry_run
+        log "[DRY RUN] Would send to: #{contact.owner_email}"
+        log "[DRY RUN] Subject: #{composed[:subject]}"
+        log "[DRY RUN] Report: #{primary_report.gamma_url}"
+        log "[DRY RUN] Variant: #{variant}"
+        log "[DRY RUN] Body preview: #{composed[:body]&.truncate(300)}"
+        sent += 1
+        next
+      end
 
       send_result = ResendEmailService.send_composed(
         to:      contact.owner_email,

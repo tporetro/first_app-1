@@ -273,6 +273,46 @@ namespace :pipeline do
   end
 
   # ---------------------------------------------------------------------------
+  # Dry run — full pipeline without sending any email. Safe to run anytime.
+  # Usage: rake pipeline:dry_run[storm_id]
+  #        rake pipeline:dry_run  (uses most recent storm)
+  # ---------------------------------------------------------------------------
+  desc 'Run full pipeline (enrich → report → script → compose) but skip the send (dry run)'
+  task :dry_run, [:storm_id] => :environment do |_, args|
+    storm = args[:storm_id] ? StormEvent.find(args[:storm_id]) : StormEvent.order(created_at: :desc).first
+    unless storm
+      puts "ERROR: No storm found. Pass a storm_id or seed one first."
+      next
+    end
+
+    puts "[DRY RUN] Storm: #{storm.name} (id=#{storm.id})"
+    puts "[DRY RUN] No emails will be sent."
+    puts ""
+
+    properties = storm.properties.where(status: 'identified').to_a
+    if properties.empty?
+      puts "[DRY RUN] No identified properties for this storm. Import some first."
+      next
+    end
+    puts "[DRY RUN] Properties: #{properties.size}"
+
+    contacts = StormPipelineService.phase_3_enrich_contacts(storm, properties)
+    puts "[DRY RUN] Contacts enriched: #{contacts.size}"
+    puts ""
+
+    report_data = StormPipelineService.phase_4_generate_reports(storm, properties, contacts)
+    puts "[DRY RUN] Reports generated: #{report_data[:property_reports].size} property, #{report_data[:portfolio_reports].size} portfolio"
+
+    scripts = StormPipelineService.phase_5_generate_scripts(storm, properties, contacts, report_data)
+    puts "[DRY RUN] Scripts generated: #{scripts.size}"
+    puts ""
+
+    would_send = StormPipelineService.phase_6_send_outreach(properties, contacts, report_data, dry_run: true)
+    puts ""
+    puts "[DRY RUN] Done. Would have sent #{would_send} email(s). Nothing was actually sent."
+  end
+
+  # ---------------------------------------------------------------------------
   # Variant performance report
   # ---------------------------------------------------------------------------
   desc 'Print A/B/C/D variant performance for a storm (rake pipeline:variants[storm_id])'
