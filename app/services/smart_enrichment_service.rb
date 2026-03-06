@@ -3,8 +3,9 @@ require 'anthropic'
 # Intelligent multi-source contact enrichment.
 #
 # Cascade strategy:
-#   1. Claude + web search (primary — finds and validates contact info)
-#   2. Secretary of State registered agent (fallback for LLCs with no web presence)
+#   1. Clay (primary — waterfalls 50+ providers, verifies emails)
+#   2. Claude + web search (fills gaps, validates, finds what Clay misses)
+#   3. Secretary of State registered agent (fallback for LLCs with no web presence)
 #
 # Outputs a confidence score so the pipeline can decide whether to send immediately,
 # flag for manual review, or skip.
@@ -25,7 +26,15 @@ class SmartEnrichmentService
     result = {}
     sources_used = []
 
-    # --- Step 1: Claude web search (primary — finds and validates contact info) ---
+    # --- Step 1: Clay (primary — waterfalls 50+ providers, verifies emails) ---
+    clay_data = ClayEnrichmentService.enrich(owner_entity: owner_entity, address: address, state: state)
+    if clay_data
+      result.merge!(clay_data)
+      sources_used << 'clay'
+      Rails.logger.info "Enrichment: Clay found #{clay_data[:human_owner_name]} for #{owner_entity}"
+    end
+
+    # --- Step 2: Claude web search (fills gaps and validates Clay) ---
     web_data = claude_web_enrich(
       owner_entity: owner_entity,
       address:      address,
@@ -34,11 +43,14 @@ class SmartEnrichmentService
     )
 
     if web_data
-      result.merge!(web_data)
+      %i[human_owner_name owner_title owner_email owner_phone owner_linkedin
+         parent_company org_domain].each do |field|
+        result[field] = web_data[field] if web_data[field].present? && result[field].blank?
+      end
       sources_used << 'web_search'
     end
 
-    # --- Step 2: Secretary of State fallback for email ---
+    # --- Step 3: Secretary of State fallback for email ---
     if result[:owner_email].blank? && state
       sos_data = secretary_of_state_lookup(owner_entity: owner_entity, state: state)
       if sos_data
