@@ -101,10 +101,11 @@ class ClayEnrichmentService
   end
 
   def self.merge_results(company_data, people_data)
+    return nil if company_data.nil? && people_data.nil?
+
     result = {}
     result.merge!(company_data || {})
     result.merge!(people_data || {})
-    result[:enrichment_source] = 'clay'
     result
   end
 
