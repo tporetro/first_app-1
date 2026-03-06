@@ -151,42 +151,49 @@ class PropStreamServiceTest < ActiveSupport::TestCase
     end
   end
 
-  # --- SmartEnrichmentService integration ---
-  test 'propstream runs as step 0 in smart enrichment' do
-    ps_result = PropStreamService::Result.new(
-      owner_name:            'Acme Roofing LLC',
-      owner_phone:           '214-555-0199',
-      owner_email:           nil,
-      owner_is_individual:   false,
-      owner_mailing_address: '456 Owner Way, Plano, TX 75023'
+  # --- SmartEnrichmentService integration (PropStream removed from cascade) ---
+  test 'pdl runs as step 1 in smart enrichment' do
+    pdl_result = PeopleDataLabsService::Result.new(
+      human_owner_name: 'Jane Smith',
+      owner_title:      'Managing Member',
+      owner_email:      'jane@acmeroofing.com',
+      owner_phone:      '214-555-0199',
+      owner_linkedin:   nil,
+      org_domain:       'acmeroofing.com'
     )
 
-    PropStreamService.stub(:lookup, ->(**) { ps_result }) do
-      SmartEnrichmentService.stub(:claude_web_enrich, ->(**) { nil }) do
-        ClayEnrichmentService.stub(:enrich, ->(**) { nil }) do
-          result = SmartEnrichmentService.enrich(
-            owner_entity: 'Acme Roofing LLC',
-            address:      '123 Main St, Dallas, TX 75201',
-            state:        'TX'
-          )
-          assert_includes result.enrichment_source, 'propstream'
-          assert_equal '214-555-0199', result.owner_phone
+    CorporationWikiService.stub(:lookup, ->(**) { nil }) do
+      PeopleDataLabsService.stub(:enrich, ->(**) { pdl_result }) do
+        SmartEnrichmentService.stub(:claude_web_enrich, ->(**) { nil }) do
+          ClayEnrichmentService.stub(:enrich, ->(**) { nil }) do
+            result = SmartEnrichmentService.enrich(
+              owner_entity: 'Acme Roofing LLC',
+              state:        'TX'
+            )
+            assert_includes result.enrichment_source, 'people_data_labs'
+            assert_equal '214-555-0199', result.owner_phone
+            assert_equal 'jane@acmeroofing.com', result.owner_email
+          end
         end
       end
     end
   end
 
-  test 'smart enrichment skips propstream when no address provided' do
+  test 'propstream is not called in smart enrichment' do
     ps_called = false
 
     PropStreamService.stub(:lookup, ->(**) { ps_called = true; nil }) do
-      SmartEnrichmentService.stub(:claude_web_enrich, ->(**) { nil }) do
-        ClayEnrichmentService.stub(:enrich, ->(**) { nil }) do
-          SmartEnrichmentService.enrich(owner_entity: 'Acme Roofing LLC', state: 'TX')
+      CorporationWikiService.stub(:lookup, ->(**) { nil }) do
+        PeopleDataLabsService.stub(:enrich, ->(**) { nil }) do
+          SmartEnrichmentService.stub(:claude_web_enrich, ->(**) { nil }) do
+            ClayEnrichmentService.stub(:enrich, ->(**) { nil }) do
+              SmartEnrichmentService.enrich(owner_entity: 'Acme Roofing LLC', state: 'TX')
+            end
+          end
         end
       end
     end
 
-    assert_not ps_called, 'PropStream should not be called when no address is available'
+    assert_not ps_called, 'PropStream should not be called — removed from cascade'
   end
 end

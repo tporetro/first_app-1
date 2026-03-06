@@ -23,7 +23,6 @@ class StormPipelineService
     storms = phase_1_detect_storms
     if storms.empty?
       log "Phase 1: No qualifying storms detected. Pipeline idle."
-      PushoverService.notify(title: 'Clawbot Idle', message: 'No storms >= 1.5" detected today.')
       return
     end
 
