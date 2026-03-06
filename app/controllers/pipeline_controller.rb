@@ -1,6 +1,7 @@
 # Lightweight status dashboard — read-only views into the pipeline.
 # Authentication handled by ApplicationController (HTTP Basic Auth).
 class PipelineController < ApplicationController
+  skip_before_action :verify_authenticity_token, only: [:trigger, :test_run]
   def index
     @storms = StormEvent.recent.limit(20)
     @stats  = {
