@@ -300,8 +300,11 @@ namespace :pipeline do
     end
     puts "[DRY RUN] Properties: #{properties.size}"
 
-    contacts = StormPipelineService.phase_3_enrich_contacts(storm, properties)
-    puts "[DRY RUN] Contacts enriched: #{contacts.size}"
+    new_contacts = StormPipelineService.phase_3_enrich_contacts(storm, properties)
+    # Merge with any contacts already enriched in a prior run
+    existing_contacts = storm.contacts.to_a
+    contacts = (new_contacts + existing_contacts).uniq(&:owner_entity)
+    puts "[DRY RUN] Contacts enriched: #{new_contacts.size} new, #{existing_contacts.size - new_contacts.size} existing (#{contacts.size} total)"
     puts ""
 
     if skip_gamma

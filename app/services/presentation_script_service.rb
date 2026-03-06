@@ -69,7 +69,7 @@ class PresentationScriptService
 
   def self.build_prompt(lead)
     prop_list = lead[:properties].map { |p|
-      "- #{p[:address]}, #{p[:city]} (#{p[:sq_ft]&.to_i&.to_s(:delimited) || 'unknown'} sq ft, #{p[:property_type]})"
+      "- #{p[:address]}, #{p[:city]} (#{p[:sq_ft] ? ActiveSupport::NumberHelper.number_to_delimited(p[:sq_ft].to_i) : 'unknown'} sq ft, #{p[:property_type]})"
     }.join("\n")
 
     <<~PROMPT
