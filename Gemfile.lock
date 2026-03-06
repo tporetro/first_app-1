@@ -159,9 +159,7 @@ GEM
     mini_portile2 (2.8.9)
     mini_racer (0.20.0)
       libv8-node (~> 24.12.0.1)
-    minitest (6.0.2)
-      drb (~> 2.0)
-      prism (~> 1.5)
+    minitest (5.27.0)
     multi_xml (0.8.1)
       bigdecimal (>= 3.1, < 5)
     net-imap (0.6.3)
@@ -341,6 +339,7 @@ DEPENDENCIES
   jbuilder
   jquery-rails
   mini_racer
+  minitest (~> 5.25)
   pg
   puma (~> 6.0)
   rails (~> 7.1)

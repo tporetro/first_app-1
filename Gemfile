@@ -49,4 +49,5 @@ end
 
 group :development, :test do
   gem 'debug'
+  gem 'minitest', '~> 5.25'
 end
