@@ -75,24 +75,38 @@ class GammaReportService
   def self.post_json(url, payload, api_key)
     uri  = URI.parse(url)
     http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
+    http.use_ssl    = true
+    http.open_timeout = 10
+    http.read_timeout = 30
     req = Net::HTTP::Post.new(uri.path)
     req['Content-Type'] = 'application/json'
     req['X-API-KEY']    = api_key
     req['accept']       = 'application/json'
     req.body = payload.to_json
     resp = http.request(req)
-    JSON.parse(resp.body) if resp.is_a?(Net::HTTPSuccess)
+    if resp.is_a?(Net::HTTPSuccess)
+      JSON.parse(resp.body)
+    else
+      Rails.logger.error "Gamma POST #{resp.code}: #{resp.body.to_s.truncate(300)}"
+      nil
+    end
   end
 
   def self.get_json(url, api_key)
     uri  = URI.parse(url)
     http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
+    http.use_ssl    = true
+    http.open_timeout = 10
+    http.read_timeout = 30
     req = Net::HTTP::Get.new(uri.path)
     req['X-API-KEY'] = api_key
     req['accept']    = 'application/json'
     resp = http.request(req)
-    JSON.parse(resp.body) if resp.is_a?(Net::HTTPSuccess)
+    if resp.is_a?(Net::HTTPSuccess)
+      JSON.parse(resp.body)
+    else
+      Rails.logger.error "Gamma GET #{resp.code}: #{resp.body.to_s.truncate(300)}"
+      nil
+    end
   end
 end

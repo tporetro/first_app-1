@@ -275,7 +275,8 @@ namespace :pipeline do
   # ---------------------------------------------------------------------------
   # Dry run — full pipeline without sending any email. Safe to run anytime.
   # Usage: rake pipeline:dry_run[storm_id]
-  #        rake pipeline:dry_run  (uses most recent storm)
+  #        rake pipeline:dry_run              (uses most recent storm)
+  #        SKIP_GAMMA=1 rake pipeline:dry_run (skip Gamma API — use placeholder URLs)
   # ---------------------------------------------------------------------------
   desc 'Run full pipeline (enrich → report → script → compose) but skip the send (dry run)'
   task :dry_run, [:storm_id] => :environment do |_, args|
@@ -285,8 +286,11 @@ namespace :pipeline do
       next
     end
 
+    skip_gamma = ENV['SKIP_GAMMA'].present?
+
     puts "[DRY RUN] Storm: #{storm.name} (id=#{storm.id})"
     puts "[DRY RUN] No emails will be sent."
+    puts "[DRY RUN] Gamma: #{skip_gamma ? 'SKIPPED (placeholder URLs)' : 'enabled'}"
     puts ""
 
     properties = storm.properties.where(status: 'identified').to_a
@@ -300,8 +304,24 @@ namespace :pipeline do
     puts "[DRY RUN] Contacts enriched: #{contacts.size}"
     puts ""
 
-    report_data = StormPipelineService.phase_4_generate_reports(storm, properties, contacts)
-    puts "[DRY RUN] Reports generated: #{report_data[:property_reports].size} property, #{report_data[:portfolio_reports].size} portfolio"
+    if skip_gamma
+      # Build stub report_data so Phases 5+6 can run without real Gamma reports
+      placeholder_url = 'https://gamma.app/docs/dry-run-placeholder'
+      property_reports = properties.map do |prop|
+        GammaReport.new(
+          property:     prop,
+          report_id:    "dry-run-#{prop.id}",
+          gamma_url:    placeholder_url,
+          status:       'completed',
+          credits_used: 0
+        )
+      end
+      report_data = { property_reports: property_reports, portfolio_reports: {} }
+      puts "[DRY RUN] Reports generated: #{property_reports.size} property stubs (SKIP_GAMMA), 0 portfolio"
+    else
+      report_data = StormPipelineService.phase_4_generate_reports(storm, properties, contacts)
+      puts "[DRY RUN] Reports generated: #{report_data[:property_reports].size} property, #{report_data[:portfolio_reports].size} portfolio"
+    end
 
     scripts = StormPipelineService.phase_5_generate_scripts(storm, properties, contacts, report_data)
     puts "[DRY RUN] Scripts generated: #{scripts.size}"
