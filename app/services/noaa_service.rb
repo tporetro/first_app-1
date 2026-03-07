@@ -9,7 +9,7 @@ class NoaaService
   SPC_TODAY_URL      = 'https://www.spc.noaa.gov/climo/reports/today_hail.html'.freeze
   MIN_HAIL_SIZE      = 1.5  # inches
 
-  TARGET_STATES = %w[TX OK KS CO NE MO AR LA MS AL GA TN NC SC].freeze
+  TARGET_STATES = %w[TX OK KS CO NE MO AR LA MS AL GA TN NC SC IN MI].freeze
 
   # Returns array of storm hashes: { date, hail_size, location, counties, state }
   # Filters to events with hail >= MIN_HAIL_SIZE in TARGET_STATES.

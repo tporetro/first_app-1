@@ -145,6 +145,70 @@ namespace :pipeline do
   end
 
   # ---------------------------------------------------------------------------
+  # Run Phase 2 (Maps of Meaning) for an existing storm — pull commercial
+  # properties from county CAD / appraisal district data.
+  # Usage: rake pipeline:maps_of_meaning[storm_id]
+  # ---------------------------------------------------------------------------
+  desc 'Run Phase 2 Maps of Meaning (CAD property scrape) for a storm (rake pipeline:maps_of_meaning[storm_id])'
+  task :maps_of_meaning, [:storm_id] => :environment do |_, args|
+    unless args[:storm_id]
+      puts "ERROR: Provide a storm_id: rake pipeline:maps_of_meaning[storm_id]"
+      next
+    end
+    storm = StormEvent.find(args[:storm_id])
+    puts "[#{Time.now}] Maps of Meaning: starting Phase 2 for #{storm.name} (#{storm.counties}, #{storm.state})"
+    count = MapsOfMeaningService.run(storm)
+    puts "[#{Time.now}] Maps of Meaning complete: #{count} commercial properties identified"
+    storm.update!(status: 'properties_identified') if count > 0
+  end
+
+  # ---------------------------------------------------------------------------
+  # Seed a storm AND immediately run Maps of Meaning to pull commercial
+  # buildings in one step (combines seed_storm + maps_of_meaning).
+  # Usage: rake pipeline:seed_and_identify[1.75,"Barber",KS,"Barber",2026-03-06]
+  # Counties: comma-separated, no spaces around commas
+  # ---------------------------------------------------------------------------
+  desc 'Seed a storm and run Maps of Meaning Phase 2 immediately (rake pipeline:seed_and_identify[hail_size,metro,state,counties,date])'
+  task :seed_and_identify, [:hail_size, :metro, :state, :counties, :date] => :environment do |_, args|
+    hail_size = args[:hail_size].to_f
+    metro     = args[:metro]
+    state     = args[:state]
+    counties  = args[:counties]
+    date      = args[:date] ? Date.parse(args[:date]) : Date.today
+
+    if hail_size < 1.5
+      puts "ERROR: Hail size #{hail_size}\" is below the 1.5\" qualifying threshold. Aborting."
+      next
+    end
+
+    name = "#{metro} #{date.strftime('%Y-%m-%d')}"
+    storm = StormEvent.find_by(name: name)
+
+    if storm
+      puts "Storm already exists: #{storm.name} (id=#{storm.id}) — running Maps of Meaning"
+    else
+      storm = StormEvent.create!(
+        name:       name,
+        event_date: date,
+        hail_size:  hail_size,
+        counties:   counties,
+        state:      state,
+        metro_area: metro,
+        status:     'detected',
+        notes:      "Manually seeded — field confirmation #{Time.now.strftime('%Y-%m-%d %H:%M')} CST"
+      )
+      puts "Storm created: #{storm.name} (id=#{storm.id})"
+    end
+
+    puts ""
+    count = MapsOfMeaningService.run(storm)
+    puts ""
+    puts "[#{Time.now}] Done: #{count} commercial properties identified for #{storm.name}"
+    puts "  Next: rake pipeline:enrich[#{storm.id}]"
+    storm.update!(status: 'properties_identified') if count > 0
+  end
+
+  # ---------------------------------------------------------------------------
   # Demo: wipe and re-seed Dallas demo data
   # Usage: rake demo:seed_dallas
   # ---------------------------------------------------------------------------

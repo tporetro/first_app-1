@@ -8,8 +8,8 @@ require 'zip'
 # Downloads bulk property export files from county appraisal districts / assessor offices
 # and returns commercial property records for use by MapsOfMeaningService.
 #
-# Covers all 14 states where Restoration GC operates:
-#   TX, OK, KS, CO, NE, MO, AR, LA, MS, AL, GA, TN, NC, SC
+# Covers all 16 states where Restoration GC operates:
+#   TX, OK, KS, CO, NE, MO, AR, LA, MS, AL, GA, TN, NC, SC, IN, MI
 #
 # Adapter types:
 #   :dcad           — Dallas CAD (ACCOUNT_INFO.CSV + COM_DETAIL.CSV joined on ACCOUNT)
@@ -209,6 +209,15 @@ class CadScraperService
         about: 'https://gis.dgcoks.gov/portal/home/item.html?id=b3b5a4b3f3d44afe922b62979a0dfdf2'
       },
       note: 'Shapefile only; free download from county GIS portal.'
+    },
+
+    # Barber County, KS (Medicine Lodge) — south-central Kansas
+    # Very small rural county (~4,500 pop); no bulk download portal confirmed.
+    'Barber' => {
+      state:   'KS',
+      adapter: :unavailable,
+      urls:    {},
+      note: 'No bulk download portal found. Contact Barber County Appraiser: barbercounty.info or (620) 886-3723 to request commercial property export.'
     },
 
     # =========================================================================
@@ -520,6 +529,15 @@ class CadScraperService
       note: 'No bulk download found on harrisoncountyms.gov. Contact assessor directly.'
     },
 
+    # Panola County, MS (Batesville) — north Mississippi
+    # Mississippi statewide GIS data at data.ms.gov; county parcel bulk download not confirmed.
+    'Panola' => {
+      state:   'MS',
+      adapter: :unavailable,
+      urls:    {},
+      note: 'Check Mississippi open data portal (data.ms.gov) for Panola County parcels. Contact Panola County Tax Assessor: panolams.org or (662) 563-6270.'
+    },
+
     # =========================================================================
     # ALABAMA (AL)
     # =========================================================================
@@ -756,6 +774,32 @@ class CadScraperService
       adapter: :unavailable,
       urls:    {},
       note: 'Bulk data likely requires data request. Contact Berkeley County GIS: gis.berkeleycountysc.gov.'
+    },
+
+    # =========================================================================
+    # INDIANA (IN)
+    # =========================================================================
+
+    # La Porte County, IN — northwest Indiana (Michigan City / La Porte)
+    # Indiana statewide parcel data available via IndianaMAP open data portal.
+    'La Porte' => {
+      state:   'IN',
+      adapter: :unavailable,
+      urls:    {},
+      note: 'Indiana parcel data available via IndianaMAP (hub.indianamap.org) — search for La Porte County parcels. Also check laportecounty.org GIS portal for county-level bulk export.'
+    },
+
+    # =========================================================================
+    # MICHIGAN (MI)
+    # =========================================================================
+
+    # St. Joseph County, MI — southwest Michigan (Centreville)
+    # Michigan statewide parcel data via Michigan Geographic Information Office (MGIO).
+    'St. Joseph' => {
+      state:   'MI',
+      adapter: :unavailable,
+      urls:    {},
+      note: 'Michigan parcel data available via MGIO (michigan.gov/egle/maps-data). Contact St. Joseph County Equalization office (Centreville, MI) for commercial property bulk export. GIS portal: stjosephcountymi.org.'
     }
 
   }.freeze
