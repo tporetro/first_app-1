@@ -209,6 +209,55 @@ namespace :pipeline do
   end
 
   # ---------------------------------------------------------------------------
+  # Seed all Mar 6 2026 storms (TX 2.25", NE 2.50", OK 2.00") and run
+  # Maps of Meaning Phase 2 for each. Multi-county storms use state-qualified
+  # county keys (e.g. "Hall TX") to avoid CAD registry collisions.
+  # Usage: rake pipeline:seed_march6_storms
+  # ---------------------------------------------------------------------------
+  desc 'Seed TX/NE/OK storms from Mar 6 2026 and run Maps of Meaning for each'
+  task seed_march6_storms: :environment do
+    storms = [
+      { hail_size: 2.25, metro: 'Hall/Collingsworth TX', state: 'TX', counties: 'Hall TX,Collingsworth', date: '2026-03-06' },
+      { hail_size: 2.50, metro: 'Thayer/Fillmore/Gage NE', state: 'NE', counties: 'Thayer,Fillmore NE,Gage', date: '2026-03-06' },
+      { hail_size: 2.00, metro: 'Roger Mills/Dewey OK', state: 'OK', counties: 'Roger Mills,Dewey OK', date: '2026-03-06' }
+    ]
+
+    storms.each do |s|
+      date = Date.parse(s[:date])
+      name = "#{s[:metro]} #{date.strftime('%Y-%m-%d')}"
+
+      storm = StormEvent.find_by(name: name)
+      if storm
+        puts "Storm already exists: #{storm.name} (id=#{storm.id})"
+      else
+        storm = StormEvent.create!(
+          name:       name,
+          event_date: date,
+          hail_size:  s[:hail_size],
+          counties:   s[:counties],
+          state:      s[:state],
+          metro_area: s[:metro],
+          status:     'detected',
+          notes:      "Manually seeded from Mar 6 2026 NOAA SPC report — #{Time.now.strftime('%Y-%m-%d %H:%M')} CST"
+        )
+        puts "Storm created: #{storm.name} (id=#{storm.id})"
+      end
+
+      puts "  Running Maps of Meaning for #{storm.name}..."
+      count = MapsOfMeaningService.run(storm)
+      puts "  → #{count} commercial properties identified"
+      storm.update!(status: 'properties_identified') if count > 0
+      puts ""
+    end
+
+    puts "[#{Time.now}] Mar 6 storms seeded. Import CSVs then run:"
+    StormEvent.where("metro_area LIKE '%TX%' OR metro_area LIKE '%NE%' OR metro_area LIKE '%OK%'")
+              .where(event_date: '2026-03-06').order(:id).each do |s|
+      puts "  rake pipeline:import_properties[#{s.id},/path/to/#{s.state.downcase}_properties.csv]"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Demo: wipe and re-seed Dallas demo data
   # Usage: rake demo:seed_dallas
   # ---------------------------------------------------------------------------

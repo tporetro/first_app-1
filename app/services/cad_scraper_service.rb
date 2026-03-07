@@ -11,6 +11,10 @@ require 'zip'
 # Covers all 16 states where Restoration GC operates:
 #   TX, OK, KS, CO, NE, MO, AR, LA, MS, AL, GA, TN, NC, SC, IN, MI
 #
+# Note on county key collisions: when the same county name exists in multiple
+# states (e.g. Hall TX vs Hall NE, Dewey OK vs others), use "<County> <ST>"
+# as the registry key and ensure storm.counties uses the same qualified name.
+#
 # Adapter types:
 #   :dcad           — Dallas CAD (ACCOUNT_INFO.CSV + COM_DETAIL.CSV joined on ACCOUNT)
 #   :hcad           — Harris CAD (year-templated URLs, tab-delimited TXT)
@@ -127,6 +131,29 @@ class CadScraperService
       }
     },
 
+    # Hall County, TX — Panhandle (Memphis, TX)
+    # Small county appraisal district; uses BIS Consulting / TrueAutomation portal.
+    # Key uses state suffix to avoid collision with Hall County NE (Grand Island).
+    'Hall TX' => {
+      state:   'TX',
+      adapter: :generic_csv,
+      urls: {
+        real: 'https://hallcad.com/downloads/real_acct.zip'
+      },
+      note: 'Hall CAD (Memphis, TX). TrueAutomation/BIS portal — verify URL at hallcad.com. If ZIP 404s, contact (806) 259-3511 for current download link.'
+    },
+
+    # Collingsworth County, TX — Panhandle (Wellington, TX)
+    # Small CAD using TrueAutomation / BIS Consulting portal.
+    'Collingsworth' => {
+      state:   'TX',
+      adapter: :generic_csv,
+      urls: {
+        real: 'https://collingsworthcad.com/downloads/real_acct.zip'
+      },
+      note: 'Collingsworth CAD (Wellington, TX). TrueAutomation/BIS portal — verify URL at collingsworthcad.com. Contact (806) 447-2830 if download fails.'
+    },
+
     # =========================================================================
     # OKLAHOMA (OK)
     # =========================================================================
@@ -149,6 +176,26 @@ class CadScraperService
       adapter: :unavailable,
       urls:    {},
       note: 'Purchase required per Records Reproduction Policy. Paid option: DataScoutPro (datascoutpro.com). Contact assessor.tulsacounty.org.'
+    },
+
+    # Roger Mills County, OK — western Oklahoma (Cheyenne, OK)
+    # Very small county (~3,600 pop). Uses Oklahoma DataScoutPro system.
+    # Key uses full name to avoid ambiguity.
+    'Roger Mills' => {
+      state:   'OK',
+      adapter: :unavailable,
+      urls:    {},
+      note: 'Small rural CAD. Use DataScoutPro (datascoutpro.com/ok/roger-mills) for paid bulk export, or contact Roger Mills County Assessor: (580) 497-3385.'
+    },
+
+    # Dewey County, OK — western Oklahoma (Taloga, OK)
+    # Very small county. Uses Oklahoma DataScoutPro system.
+    # Key uses state suffix to avoid potential future ambiguity.
+    'Dewey OK' => {
+      state:   'OK',
+      adapter: :unavailable,
+      urls:    {},
+      note: 'Small rural CAD. Use DataScoutPro (datascoutpro.com/ok/dewey) for paid bulk export, or contact Dewey County Assessor: (580) 328-5331.'
     },
 
     # =========================================================================
@@ -342,6 +389,34 @@ class CadScraperService
         portal: 'https://opengis.grand-island.com/'
       },
       note: 'Free download from Hall County / Grand Island GIS portal.'
+    },
+
+    # Thayer County, NE (Hebron) — south-central Nebraska
+    # Small county; uses gWorks property portal (no bulk download).
+    'Thayer' => {
+      state:   'NE',
+      adapter: :unavailable,
+      urls:    {},
+      note: 'gWorks property portal at thayerne.gworks.com — no bulk CSV download. Contact Thayer County Assessor (Hebron, NE): (402) 768-6417 for commercial property export.'
+    },
+
+    # Fillmore County, NE (Geneva) — south-central Nebraska
+    # Small county; uses gWorks property portal (no bulk download).
+    # Key uses state suffix to avoid potential conflict.
+    'Fillmore NE' => {
+      state:   'NE',
+      adapter: :unavailable,
+      urls:    {},
+      note: 'gWorks property portal at fillmorene.gworks.com — no bulk CSV download. Contact Fillmore County Assessor (Geneva, NE): (402) 759-4931 for commercial property export.'
+    },
+
+    # Gage County, NE (Beatrice) — southeast Nebraska
+    # Uses gWorks property portal; no confirmed bulk CSV download.
+    'Gage' => {
+      state:   'NE',
+      adapter: :unavailable,
+      urls:    {},
+      note: 'gWorks property portal at gagene.gworks.com — no bulk CSV download. Contact Gage County Assessor (Beatrice, NE): (402) 223-1316 for commercial property export.'
     },
 
     # =========================================================================
