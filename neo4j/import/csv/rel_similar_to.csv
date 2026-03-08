@@ -1,0 +1,11 @@
+property_id_a,property_id_b,similarity_score,similarity_basis,notes
+PR001,PR006,0.82,asset_type+roof_age+market,Both flex industrial - similar roof age and Houston market
+PR001,PR015,0.75,asset_type+storm_exposure,Both high opportunity industrial with storm history
+PR002,PR012,0.91,asset_type+roof_age+owner_type,Both aged retail - high score - absentee or distressed owners
+PR004,PR014,0.88,asset_type+roof_type+owner,Same owner - same roof type - similar condition
+PR005,PR015,0.79,asset_type+roof_age+state,Both large warehouse - aged metal roofs - TX
+PR008,PR003,0.71,asset_type+market_proximity,Both office buildings - DFW adjacent markets
+PR009,PR003,0.84,asset_type+condition+market,Both well-maintained office - low opportunity
+PR010,PR011,0.73,asset_type+structure_age,Both historic warehouse repositioning candidates
+PR012,PR002,0.91,asset_type+roof_condition+opportunity_score,Highest similarity - both critical-condition retail
+PR013,PR001,0.78,asset_type+roof_type+market,Both flex - TPO - Austin and Houston

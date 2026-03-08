@@ -1,0 +1,19 @@
+person_id_a,person_id_b,relationship_type,strength,since_year,notes
+P001,P005,Business Partner,9,2015,Co-invested on two Austin projects
+P001,P009,Professional,6,2019,Sunbelt provides market reports
+P002,P008,Colleague,8,2012,Both Houston commercial brokers
+P002,P014,Business,7,2018,Harrington refers suburban deals to Nexus
+P003,P010,Investor Network,7,2017,Both distressed asset buyers
+P004,P007,Business,8,2014,Okafor hired Drummond for PM
+P004,P014,Business,6,2020,Harrington listed Okafor retail assets
+P005,P013,Close Business,10,2014,Co-developed 3 Austin projects - key connector pair
+P006,P009,Professional,5,2021,Nair hired Sunbelt for leasing analysis
+P007,P008,Professional,6,2016,Drummond refers insurance claims to Vermilion
+P008,P012,Business,9,2019,Vermilion brokered Carver's flex acquisition
+P009,P013,Professional,7,2022,Yuen uses Sunbelt data for site selection
+P010,P003,Investor Network,8,2017,Schwartz and Marcus share distressed deal flow
+P011,P004,Business,6,2020,Both own commercial in SA metro - referrals
+P012,P008,Client,9,2019,Vermilion manages Carver Houston assets
+P013,P002,Business,8,2021,Yuen lists with Nexus on Houston deals
+P014,P001,Professional,5,2023,Capitol REIT acquired one Harrington listing
+P015,P008,Professional,7,2022,Duplessis connected through post-storm network

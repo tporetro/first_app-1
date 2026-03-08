@@ -1,0 +1,16 @@
+person_id,company_id,relationship_type,title,since_year,ownership_pct,notes
+P001,C001,WORKS_FOR,Principal,2005,35,Founding partner
+P002,C002,WORKS_FOR,Managing Broker,2010,60,Majority owner
+P003,,,,,,Individual investor - no company affiliation
+P004,C003,WORKS_FOR,Owner,2008,100,Sole owner of Okafor Holdings
+P005,C004,WORKS_FOR,Principal,2012,70,Majority owner - co-founder
+P006,C005,WORKS_FOR,Trustee,2001,0,Family trustee - not equity
+P007,C006,WORKS_FOR,Founder,2003,100,Sole owner Drummond Properties
+P008,C007,WORKS_FOR,Founder,2007,80,Majority partner
+P009,,WORKS_FOR,Senior Analyst,2020,0,Employee at Sunbelt CRE
+P010,C008,WORKS_FOR,Managing Partner,2000,55,Majority GP Schwartz Capital
+P011,C009,WORKS_FOR,Owner,2015,100,Sole owner Mendoza Group
+P012,C010,WORKS_FOR,Owner,2011,100,Sole owner Carver Assets
+P013,C011,WORKS_FOR,Managing Partner,2014,65,Majority partner Yuen Ventures
+P014,C012,WORKS_FOR,Broker-Owner,2009,100,Sole owner Harrington CRE
+P015,C013,WORKS_FOR,Managing Member,2006,80,Majority owner Bayou RE

@@ -1,0 +1,16 @@
+property_id,storm_id,damage_severity,damage_type,claim_filed,claim_amount,claim_status,inspection_done,notes
+PR001,S002,Moderate,Hail - Roof,true,185000,Settled,true,2021 hail event - 18-yr TPO
+PR002,S002,Severe,Hail - Roof + Facade,true,310000,Pending,false,Never properly repaired - current opportunity
+PR004,S006,Moderate,Hail - Roof,true,195000,Settled,true,2024 SA hail event
+PR005,S007,Minor,Hail - Roof,false,0,None,false,Austin 2022 - owner did not file
+PR006,S001,Severe,Hurricane - Flood + Wind,true,520000,Settled,true,Harvey 2017 - post claim renovation
+PR008,S003,Moderate,Hail - Roof,true,175000,Settled,true,DFW 2023 hail
+PR009,S004,Minor,Ice - Roof + HVAC,true,95000,Settled,true,Uri 2021 - trust-held - quick repair
+PR010,S004,Moderate,Ice - Roof + Structural,true,210000,Settled,true,Uri 2021 - historic building concern
+PR011,S005,Severe,Hurricane - Roof + Structural,true,640000,Settled,true,Ida 2021 - major renovation followed
+PR012,S001,Severe,Hurricane - Flood + Roof,true,720000,Settled,true,Harvey 2017 - partial rebuild only
+PR012,S002,Severe,Hail - Roof,false,0,None,false,2021 hail - absentee owner ignored
+PR013,S007,Minor,Hail - Roof,true,78000,Settled,true,Austin 2022 - partial TPO repair
+PR014,S006,Moderate,Hail - Roof,true,220000,Settled,true,SA 2024 hail
+PR015,S002,Severe,Hail - Roof,true,390000,Pending,false,2021 hail - partial repair only - prime opportunity
+PR015,S008,Moderate,Tropical - Flooding,true,280000,Settled,true,Beta 2020 - flooding damage

@@ -1,0 +1,13 @@
+proof_project_id,property_id,distance_miles,same_market,same_asset_type,notes
+PP001,PR006,8.2,true,true,Westchase flex proof near Katy flex
+PP001,PR015,14.1,true,false,Westchase proof near Humble industrial - same market
+PP002,PR004,0.5,true,true,Same owner - direct proof on adjacent strip
+PP003,PR010,0.2,true,true,Same property - self-referencing proof
+PP004,PR013,0.1,true,true,Same property - Mueller proof
+PP005,PR002,7.3,true,true,Meyerland retail proof near North Loop retail
+PP005,PR012,0.3,true,true,Very near Meyerland - same submarket
+PP006,PR002,0.4,true,true,North Loop proof on target property
+PP007,PR004,2.1,true,true,Medical office proof near Alamo retail - same owner
+PP008,PR008,0.1,true,true,Fort Worth proof on same property
+PP009,PR015,0.1,true,false,Humble proof on same property - partial repair
+PP010,PR005,0.2,true,true,Southpark proof on same property

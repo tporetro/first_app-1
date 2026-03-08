@@ -1,0 +1,16 @@
+person_id,name,email,phone,organization,role,trust_score,influence_score,last_contact,city,state,notes
+P001,Robert Callahan,rcallahan@capitalprop.com,512-555-0101,Capital Property Group,Owner,87,92,2025-11-15,Austin,TX,Multi-family portfolio owner
+P002,Sandra Tran,stran@nexusre.com,713-555-0202,Nexus Real Estate,Broker,75,88,2025-12-01,Houston,TX,Top commercial broker in Houston metro
+P003,Marcus Webb,mwebb@gmail.com,214-555-0303,,Private Investor,60,55,2025-10-20,Dallas,TX,High net worth individual - storm claims history
+P004,Diane Okafor,dokafor@okaforholdings.com,210-555-0404,Okafor Holdings LLC,Owner,91,78,2026-01-05,San Antonio,TX,Retail strip center owner - aging roofs
+P005,James Llewelyn,jllewelyn@llewelyndev.com,512-555-0505,Llewelyn Development,Developer,82,95,2026-01-12,Austin,TX,Active developer - connector to city planning
+P006,Priya Nair,pnair@nairfamily.com,469-555-0606,Nair Family Trust,Owner,70,62,2025-09-30,Plano,TX,Trust-held office portfolio
+P007,Kevin Drummond,kdrummond@drumprop.com,817-555-0707,Drummond Properties,Property Manager,65,71,2025-11-20,Fort Worth,TX,Manages 40+ commercial properties
+P008,Angela Rossi,arossi@vermilionre.com,713-555-0808,Vermilion Real Estate,Broker,88,90,2026-01-18,Houston,TX,Hurricane Harvey veteran - insurance expert
+P009,Tom Hatfield,that field@sunbeltcre.com,512-555-0909,Sunbelt CRE,Analyst,50,45,2026-02-01,Austin,TX,Market data specialist
+P010,Linda Schwartz,lschwartz@schwarzcap.com,214-555-1010,Schwartz Capital,Investor,78,84,2025-12-20,Dallas,TX,Distressed asset specialist
+P011,Carlos Mendoza,cmendoza@mendozagroup.com,956-555-1111,Mendoza Group,Owner,73,68,2025-10-10,McAllen,TX,Industrial warehouse portfolio
+P012,Beth Carver,bcarver@carverassets.com,713-555-1212,Carver Assets LLC,Owner,80,76,2026-01-25,Houston,TX,Owns hail-damaged flex space portfolio
+P013,Derek Yuen,dyuen@yuenventures.com,512-555-1313,Yuen Ventures,Developer,85,93,2026-02-10,Austin,TX,Key connector - knows every contractor
+P014,Sophia Harrington,sharrington@hcre.com,281-555-1414,Harrington CRE,Broker,79,87,2026-01-30,Katy,TX,Suburban retail specialist
+P015,Frank Duplessis,fduplessis@bayoure.com,504-555-1515,Bayou Real Estate,Owner,68,60,2025-11-05,New Orleans,LA,Post-Ida portfolio recovery
