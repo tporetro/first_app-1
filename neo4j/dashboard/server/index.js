@@ -933,12 +933,13 @@ app.get('/api/gds/paths', async (req, res) => {
       WITH path,
            reduce(cost = 0.0, r IN relationships(path) |
              cost + CASE type(r)
-               WHEN 'CONNECTED_TO' THEN toFloat(COALESCE(r.strength, 0.5))
-               WHEN 'WORKS_FOR'    THEN 0.3
-               WHEN 'OWNS'         THEN 0.4
-               WHEN 'PROOF_NEAR'   THEN 0.5
-               WHEN 'LOCATED_IN'   THEN 0.7
-               ELSE 0.8
+               WHEN 'CONNECTED_TO' THEN toFloat(COALESCE(r.strength, 2.0))
+               WHEN 'PROOF_NEAR'   THEN 2.0
+               WHEN 'WORKS_FOR'    THEN 2.0
+               WHEN 'OWNS'         THEN 3.0
+               WHEN 'LOCATED_IN'   THEN 4.0
+               WHEN 'SIMILAR_TO'   THEN 4.0
+               ELSE 5.0
              END
            ) AS totalCost
       RETURN
@@ -963,6 +964,67 @@ app.get('/api/gds/paths', async (req, res) => {
       ...paths[0],
       alternates: paths.slice(1),
     });
+  } catch (inner) {
+    res.status(500).json({ error: inner.message });
+  }
+});
+
+// ── POST /api/gds/similarity/write — create SIMILAR_TO rels ──
+// Computes Node Similarity and MERGE-writes SIMILAR_TO relationships
+// with similarity_score between Property nodes.
+// Also sets Property.similarity_score to the max similarity for each node.
+app.post('/api/gds/similarity/write', async (req, res) => {
+  try {
+    // GDS write mode
+    const r = await run(`
+      CALL gds.nodeSimilarity.write({
+        nodeProjection: { Property: {}, Market: {} },
+        relationshipProjection: { LOCATED_IN: { orientation: 'NATURAL' } },
+        writeRelationshipType: 'SIMILAR_TO',
+        writeProperty:         'similarity_score',
+        similarityCutoff:      0.3,
+        topK:                  5
+      })
+      YIELD nodesCompared, relationshipsWritten, computeMillis
+      RETURN nodesCompared, relationshipsWritten, computeMillis
+    `);
+    const rec = r.records[0];
+    return res.json({
+      ok:                    true,
+      source:                'gds',
+      nodesCompared:         toPlain(rec.get('nodesCompared')),
+      relationshipsWritten:  toPlain(rec.get('relationshipsWritten')),
+      computeMillis:         toPlain(rec.get('computeMillis')),
+    });
+  } catch (err) {
+    if (!gdsErr(err)) return res.status(500).json({ error: err.message });
+  }
+
+  // Fallback: Cypher Jaccard via shared LOCATED_IN markets
+  try {
+    const r = await run(`
+      MATCH (a:Property)-[:LOCATED_IN]->(m:Market)<-[:LOCATED_IN]-(b:Property)
+      WHERE id(a) < id(b) AND a.asset_type = b.asset_type
+      WITH a, b, COUNT(DISTINCT m) AS shared,
+           SIZE([(a)-[:LOCATED_IN]->() | 1]) AS sizeA,
+           SIZE([(b)-[:LOCATED_IN]->() | 1]) AS sizeB
+      WITH a, b,
+           toFloat(shared) / (sizeA + sizeB - shared) AS similarity
+      WHERE similarity >= 0.3
+      MERGE (a)-[r:SIMILAR_TO]-(b)
+      SET r.similarity_score = round(similarity, 4),
+          r.computed_at      = datetime()
+      WITH a, b, similarity
+      SET a.similarity_score = CASE
+        WHEN a.similarity_score IS NULL OR similarity > a.similarity_score
+        THEN round(similarity, 4) ELSE a.similarity_score END
+      SET b.similarity_score = CASE
+        WHEN b.similarity_score IS NULL OR similarity > b.similarity_score
+        THEN round(similarity, 4) ELSE b.similarity_score END
+      RETURN COUNT(*) AS relationshipsWritten
+    `);
+    const count = toPlain(r.records[0]?.get('relationshipsWritten') ?? 0);
+    res.json({ ok: true, source: 'cypher_jaccard_fallback', relationshipsWritten: count });
   } catch (inner) {
     res.status(500).json({ error: inner.message });
   }
@@ -1023,14 +1085,14 @@ app.post('/api/gds/write', async (req, res) => {
           PROOF_NEAR: { orientation: 'NATURAL' }
         },
         dampingFactor: 0.85, maxIterations: 20,
-        writeProperty: 'gds_pagerank'
+        writeProperty: 'influence_score'
       })
       YIELD nodePropertiesWritten, computeMillis
       RETURN nodePropertiesWritten, computeMillis
     `);
     const rec = r.records[0];
     results.pagerank = {
-      property: 'gds_pagerank',
+      property: 'influence_score',
       nodesWritten: toPlain(rec.get('nodePropertiesWritten')),
       ms: toPlain(rec.get('computeMillis')),
     };
