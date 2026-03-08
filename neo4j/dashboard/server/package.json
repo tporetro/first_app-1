@@ -1,0 +1,16 @@
+{
+  "name": "ois-graph-server",
+  "version": "1.0.0",
+  "description": "Neo4j Opportunity Intelligence System — API Server",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "neo4j-driver": "^5.19.0"
+  }
+}
