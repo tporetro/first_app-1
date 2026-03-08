@@ -19,6 +19,7 @@ import ConnectorList   from './components/ConnectorList';
 import PipelineView    from './components/PipelineView';
 import ActionList      from './components/ActionList';
 import ClusterGrid     from './components/ClusterGrid';
+import GdsPanel        from './components/GdsPanel';
 
 // ── small helpers ─────────────────────────────────────────────
 function Panel({
@@ -178,13 +179,29 @@ export default function App() {
   }, []);
 
   // ── nav tabs ─────────────────────────────────────────────────
-  const tabs: { key: ViewMode; label: string }[] = [
+  const tabs: { key: ViewMode; label: string; accent?: string }[] = [
     { key: 'graph',         label: 'Graph' },
     { key: 'opportunities', label: 'Opportunities' },
     { key: 'connectors',    label: 'Connectors' },
     { key: 'pipeline',      label: 'Pipeline' },
     { key: 'actions',       label: 'Actions' },
+    { key: 'gds',           label: 'GDS', accent: '#A855F7' },
   ];
+
+  // ── GDS callbacks ───────────────────────────────────────────
+  const handleGdsNavigate = useCallback((id: string) => {
+    const node = graphData.nodes.find(n => n.id === id);
+    if (node) { setSelectedNode(node); setView('graph'); }
+  }, [graphData.nodes]);
+
+  const handleGdsFocusNodes = useCallback((_ids: string[]) => {
+    // Switch to graph; the IDs could be used to highlight in future
+    setView('graph');
+  }, []);
+
+  const handleGdsHighlightPath = useCallback((_ids: string[]) => {
+    setView('graph');
+  }, []);
 
   const totalNodes = useMemo(() =>
     stats?.nodes.reduce((a, n) => a + n.count, 0) ?? 0, [stats]);
@@ -216,6 +233,11 @@ export default function App() {
                   ? 'bg-slate-700 text-white'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
+              style={t.accent && view === t.key
+                ? { color: t.accent, background: t.accent + '22' }
+                : t.accent
+                ? { color: t.accent + 'bb' }
+                : undefined}
             >
               {t.label}
             </button>
@@ -347,6 +369,22 @@ export default function App() {
              dashError   ? <ErrorMsg msg={dashError} /> :
              <ActionList rows={actions} />}
           </Panel>
+        </div>
+      )}
+
+      {/* ── GDS View ──────────────────────────────────────── */}
+      {view === 'gds' && (
+        <div className="flex-1 overflow-hidden">
+          <GdsPanel
+            graphNodes={graphData.nodes}
+            onNavigateNode={handleGdsNavigate}
+            onFocusNodes={handleGdsFocusNodes}
+            onHighlightPath={handleGdsHighlightPath}
+            onWriteComplete={() => {
+              // Refresh stats after write-back so new scores appear in graph
+              fetchStats().then(setStats).catch(console.error);
+            }}
+          />
         </div>
       )}
     </div>

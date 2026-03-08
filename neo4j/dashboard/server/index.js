@@ -496,6 +496,577 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════
+// GDS — Graph Data Science algorithms
+// Each endpoint tries native GDS first; falls back to Cypher
+// approximation so the dashboard works even without the GDS plugin.
+// ══════════════════════════════════════════════════════════════
+
+function gdsErr(err) {
+  // Detect missing GDS plugin
+  return err.code === 'Neo.ClientError.Procedure.ProcedureNotFound'
+      || err.message?.toLowerCase().includes('gds.')
+      || err.message?.toLowerCase().includes('no procedure');
+}
+
+// ── 1. Betweenness Centrality ────────────────────────────────
+// "Who actually connects clusters?"
+// Finds bridge people: brokers, connectors, community figures.
+// High score = sits on many shortest paths between others.
+app.get('/api/gds/betweenness', async (req, res) => {
+  // GDS path first
+  try {
+    const r = await run(`
+      CALL gds.betweenness.stream({
+        nodeProjection: ['Person','Company'],
+        relationshipProjection: {
+          CONNECTED_TO: { orientation: 'UNDIRECTED' },
+          WORKS_FOR:    { orientation: 'UNDIRECTED' }
+        }
+      })
+      YIELD nodeId, score
+      WITH gds.util.asNode(nodeId) AS n, score
+      WHERE score > 0
+      RETURN
+        toString(id(n))   AS id,
+        n.name            AS name,
+        labels(n)[0]      AS type,
+        n.role            AS role,
+        n.email           AS email,
+        n.trust_score     AS trust_score,
+        n.influence_score AS influence_score,
+        round(score, 2)   AS betweenness_score,
+        false             AS approximated
+      ORDER BY score DESC
+      LIMIT 20
+    `);
+    return res.json({
+      algorithm: 'betweenness_centrality',
+      source: 'gds',
+      rows: r.records.map(rec => Object.fromEntries(rec.keys.map(k => [k, toPlain(rec.get(k))]))),
+    });
+  } catch (err) {
+    if (!gdsErr(err)) return res.status(500).json({ error: err.message });
+  }
+
+  // Cypher fallback: degree centrality on CONNECTED_TO graph
+  try {
+    const r = await run(`
+      MATCH (p:Person)
+      OPTIONAL MATCH (p)-[:CONNECTED_TO]-(peer:Person)
+      WITH p, COUNT(DISTINCT peer) AS degree
+      OPTIONAL MATCH (p)-[:OWNS]->(pr:Property)
+      RETURN
+        toString(id(p))   AS id,
+        p.name            AS name,
+        'Person'          AS type,
+        p.role            AS role,
+        p.email           AS email,
+        p.trust_score     AS trust_score,
+        p.influence_score AS influence_score,
+        toFloat(degree)   AS betweenness_score,
+        true              AS approximated
+      ORDER BY degree DESC
+      LIMIT 20
+    `);
+    res.json({
+      algorithm: 'betweenness_centrality',
+      source: 'cypher_degree_approx',
+      rows: r.records.map(rec => Object.fromEntries(rec.keys.map(k => [k, toPlain(rec.get(k))]))),
+    });
+  } catch (inner) {
+    res.status(500).json({ error: inner.message });
+  }
+});
+
+// ── 2. PageRank ──────────────────────────────────────────────
+// "Who has the most network influence?"
+// Not just direct connections — importance flows from important nodes.
+// Ranks: owners, connectors, proof nodes, companies.
+app.get('/api/gds/pagerank', async (req, res) => {
+  try {
+    const r = await run(`
+      CALL gds.pageRank.stream({
+        nodeProjection: ['Person','Property','Company','ProofProject'],
+        relationshipProjection: {
+          OWNS:         { orientation: 'NATURAL' },
+          CONNECTED_TO: { orientation: 'NATURAL' },
+          WORKS_FOR:    { orientation: 'NATURAL' },
+          MANAGES:      { orientation: 'NATURAL' },
+          PROOF_NEAR:   { orientation: 'NATURAL' }
+        },
+        dampingFactor: 0.85,
+        maxIterations: 20
+      })
+      YIELD nodeId, score
+      WITH gds.util.asNode(nodeId) AS n, score
+      RETURN
+        toString(id(n))   AS id,
+        n.name            AS name,
+        labels(n)[0]      AS type,
+        n.role            AS role,
+        n.asset_type      AS asset_type,
+        n.opportunity_score AS opportunity_score,
+        round(score, 5)   AS pagerank_score,
+        false             AS approximated
+      ORDER BY score DESC
+      LIMIT 30
+    `);
+    return res.json({
+      algorithm: 'pagerank',
+      source: 'gds',
+      rows: r.records.map(rec => Object.fromEntries(rec.keys.map(k => [k, toPlain(rec.get(k))]))),
+    });
+  } catch (err) {
+    if (!gdsErr(err)) return res.status(500).json({ error: err.message });
+  }
+
+  // Fallback: weighted in-degree (incoming relationship count)
+  try {
+    const r = await run(`
+      MATCH (n) WHERE any(l IN labels(n) WHERE l IN ['Person','Property','Company','ProofProject'])
+      OPTIONAL MATCH ()-[r_in]->(n)
+      OPTIONAL MATCH (n)-[r_out]->()
+      WITH n,
+           COUNT(DISTINCT r_in)  AS in_degree,
+           COUNT(DISTINCT r_out) AS out_degree
+      RETURN
+        toString(id(n))   AS id,
+        n.name            AS name,
+        labels(n)[0]      AS type,
+        n.role            AS role,
+        n.asset_type      AS asset_type,
+        n.opportunity_score AS opportunity_score,
+        toFloat(in_degree + out_degree * 0.5) AS pagerank_score,
+        true              AS approximated
+      ORDER BY pagerank_score DESC
+      LIMIT 30
+    `);
+    res.json({
+      algorithm: 'pagerank',
+      source: 'cypher_degree_approx',
+      rows: r.records.map(rec => Object.fromEntries(rec.keys.map(k => [k, toPlain(rec.get(k))]))),
+    });
+  } catch (inner) {
+    res.status(500).json({ error: inner.message });
+  }
+});
+
+// ── 3. Louvain Community Detection ──────────────────────────
+// "Which hidden ecosystems exist in the graph?"
+// Lewisville retail cluster · Plano retail · broker-centered networks
+// Surfaces groups of nodes that are densely connected to each other.
+app.get('/api/gds/communities', async (req, res) => {
+  try {
+    const r = await run(`
+      CALL gds.louvain.stream({
+        nodeProjection: ['Person','Property','Company','Market'],
+        relationshipProjection: {
+          CONNECTED_TO: { orientation: 'UNDIRECTED' },
+          OWNS:         { orientation: 'UNDIRECTED' },
+          WORKS_FOR:    { orientation: 'UNDIRECTED' },
+          LOCATED_IN:   { orientation: 'UNDIRECTED' }
+        }
+      })
+      YIELD nodeId, communityId
+      WITH communityId, collect(gds.util.asNode(nodeId)) AS members
+      WITH communityId,
+           size(members)                                              AS size,
+           [n IN members | n.name][..6]                              AS sample_names,
+           [n IN members | toString(id(n))]                          AS node_ids,
+           SIZE([n IN members WHERE labels(n)[0]='Person'])   AS person_count,
+           SIZE([n IN members WHERE labels(n)[0]='Property'])  AS property_count,
+           SIZE([n IN members WHERE labels(n)[0]='Market'])    AS market_count,
+           SIZE([n IN members WHERE labels(n)[0]='Company'])   AS company_count,
+           // Dominant asset type if all properties
+           [n IN members WHERE n.asset_type IS NOT NULL | n.asset_type][0] AS hint_asset_type,
+           // Dominant market
+           [n IN members WHERE labels(n)[0]='Market' | n.name][0] AS hint_market,
+           // Average opportunity score across properties in community
+           AVG([n IN members WHERE n.opportunity_score IS NOT NULL | n.opportunity_score][0]) AS avg_opp_score
+      WHERE size >= 2
+      RETURN
+        communityId,
+        size,
+        sample_names,
+        node_ids[..12]      AS node_ids,
+        person_count,
+        property_count,
+        market_count,
+        company_count,
+        hint_asset_type,
+        hint_market,
+        round(COALESCE(avg_opp_score, 0), 1) AS avg_opp_score,
+        false AS approximated
+      ORDER BY size DESC
+      LIMIT 20
+    `);
+    return res.json({
+      algorithm: 'louvain_community_detection',
+      source: 'gds',
+      communities: r.records.map(rec => Object.fromEntries(rec.keys.map(k => [k, toPlain(rec.get(k))]))),
+    });
+  } catch (err) {
+    if (!gdsErr(err)) return res.status(500).json({ error: err.message });
+  }
+
+  // Fallback: weakly connected components via Cypher BFS
+  try {
+    const r = await run(`
+      MATCH (n)-[r]-(m)
+      WHERE any(l IN labels(n) WHERE l IN ['Person','Property','Company','Market'])
+        AND any(l IN labels(m) WHERE l IN ['Person','Property','Company','Market'])
+      WITH n.person_id AS group_seed,
+           collect(DISTINCT n.name)[..6] AS sample_names,
+           COUNT(DISTINCT n)             AS size,
+           COUNT(DISTINCT CASE WHEN labels(n)[0]='Person'   THEN n END) AS person_count,
+           COUNT(DISTINCT CASE WHEN labels(n)[0]='Property' THEN n END) AS property_count,
+           COUNT(DISTINCT CASE WHEN labels(n)[0]='Market'   THEN n END) AS market_count
+      WHERE group_seed IS NOT NULL AND size >= 2
+      RETURN
+        group_seed                  AS communityId,
+        size,
+        sample_names,
+        []                          AS node_ids,
+        person_count,
+        property_count,
+        market_count,
+        0                           AS company_count,
+        null                        AS hint_asset_type,
+        null                        AS hint_market,
+        0.0                         AS avg_opp_score,
+        true                        AS approximated
+      ORDER BY size DESC
+      LIMIT 20
+    `);
+    res.json({
+      algorithm: 'louvain_community_detection',
+      source: 'cypher_approx',
+      communities: r.records.map(rec => Object.fromEntries(rec.keys.map(k => [k, toPlain(rec.get(k))]))),
+    });
+  } catch (inner) {
+    res.status(500).json({ error: inner.message });
+  }
+});
+
+// ── 4. Node Similarity ───────────────────────────────────────
+// "Show me more like this."
+// Jaccard similarity on shared neighbors.
+// owners mode:     owners who own similar property portfolios
+// properties mode: properties with similar market/storm exposure
+app.get('/api/gds/similarity', async (req, res) => {
+  const mode = req.query.mode === 'properties' ? 'properties' : 'owners';
+
+  const gdsConfig = mode === 'owners'
+    ? {
+        nodeProjection: { Person: {}, Property: {} },
+        relProjection:  { OWNS: { orientation: 'NATURAL' } },
+        filterSrc:      'Person',
+        filterTgt:      'Person',
+      }
+    : {
+        nodeProjection: { Property: {}, Market: {} },
+        relProjection:  { LOCATED_IN: { orientation: 'NATURAL' } },
+        filterSrc:      'Property',
+        filterTgt:      'Property',
+      };
+
+  try {
+    const r = await run(`
+      CALL gds.nodeSimilarity.stream({
+        nodeProjection:         $nodeProjection,
+        relationshipProjection: $relProjection,
+        similarityCutoff:       0.2,
+        topK:                   5
+      })
+      YIELD node1, node2, similarity
+      WITH gds.util.asNode(node1) AS a, gds.util.asNode(node2) AS b, similarity
+      WHERE labels(a)[0] = $src AND labels(b)[0] = $tgt
+      RETURN
+        toString(id(a))         AS id1,
+        a.name                  AS name1,
+        labels(a)[0]            AS type1,
+        a.role                  AS role1,
+        a.asset_type            AS asset_type1,
+        a.opportunity_score     AS score1,
+        toString(id(b))         AS id2,
+        b.name                  AS name2,
+        labels(b)[0]            AS type2,
+        b.role                  AS role2,
+        b.asset_type            AS asset_type2,
+        b.opportunity_score     AS score2,
+        round(similarity, 3)    AS similarity
+      ORDER BY similarity DESC
+      LIMIT 25
+    `, {
+      nodeProjection: gdsConfig.nodeProjection,
+      relProjection:  gdsConfig.relProjection,
+      src:            gdsConfig.filterSrc,
+      tgt:            gdsConfig.filterTgt,
+    });
+    return res.json({
+      algorithm: 'node_similarity',
+      source: 'gds',
+      mode,
+      pairs: r.records.map(rec => Object.fromEntries(rec.keys.map(k => [k, toPlain(rec.get(k))]))),
+    });
+  } catch (err) {
+    if (!gdsErr(err)) return res.status(500).json({ error: err.message });
+  }
+
+  // Fallback: overlap via shared properties/markets using Cypher
+  try {
+    let cypher;
+    if (mode === 'owners') {
+      cypher = `
+        MATCH (a:Person)-[:OWNS]->(p:Property)<-[:OWNS]-(b:Person)
+        WHERE id(a) < id(b)
+        WITH a, b, COUNT(DISTINCT p) AS shared,
+             SIZE((a)-[:OWNS]->()) AS sizeA,
+             SIZE((b)-[:OWNS]->()) AS sizeB
+        WITH a, b, shared,
+             toFloat(shared) / (sizeA + sizeB - shared) AS similarity
+        WHERE similarity > 0
+        RETURN
+          toString(id(a)) AS id1, a.name AS name1, 'Person' AS type1, a.role AS role1,
+          null AS asset_type1, null AS score1,
+          toString(id(b)) AS id2, b.name AS name2, 'Person' AS type2, b.role AS role2,
+          null AS asset_type2, null AS score2,
+          round(similarity, 3) AS similarity
+        ORDER BY similarity DESC
+        LIMIT 25
+      `;
+    } else {
+      cypher = `
+        MATCH (a:Property)-[:LOCATED_IN]->(m:Market)<-[:LOCATED_IN]-(b:Property)
+        WHERE id(a) < id(b) AND a.asset_type = b.asset_type
+        WITH a, b, COUNT(DISTINCT m) AS shared
+        RETURN
+          toString(id(a)) AS id1, a.name AS name1, 'Property' AS type1, null AS role1,
+          a.asset_type AS asset_type1, a.opportunity_score AS score1,
+          toString(id(b)) AS id2, b.name AS name2, 'Property' AS type2, null AS role2,
+          b.asset_type AS asset_type2, b.opportunity_score AS score2,
+          toFloat(shared) AS similarity
+        ORDER BY similarity DESC
+        LIMIT 25
+      `;
+    }
+    const r = await run(cypher);
+    res.json({
+      algorithm: 'node_similarity',
+      source: 'cypher_overlap_approx',
+      mode,
+      pairs: r.records.map(rec => Object.fromEntries(rec.keys.map(k => [k, toPlain(rec.get(k))]))),
+    });
+  } catch (inner) {
+    res.status(500).json({ error: inner.message });
+  }
+});
+
+// ── 5. Weighted Dijkstra ─────────────────────────────────────
+// "What is the lowest-resistance path between two nodes?"
+// Not hop count — relationship STRENGTH as edge weight:
+//   family  → cost 0.1 (very strong)  |  trusted client → 0.3
+//   owns    → 0.4                      |  proof adjacency → 0.5
+//   market  → 0.7                      |  default → 0.8
+// Lower total cost = warmer introduction path.
+app.get('/api/gds/paths', async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) return res.status(400).json({ error: 'from and to required' });
+  const fromId = neo4j.int(parseInt(from));
+  const toId   = neo4j.int(parseInt(to));
+
+  // Try GDS Dijkstra (requires weight property on relationships)
+  try {
+    const r = await run(`
+      CALL gds.shortestPath.dijkstra.stream({
+        nodeProjection: ['Person','Company','Property','ProofProject'],
+        relationshipProjection: {
+          CONNECTED_TO: {
+            orientation: 'UNDIRECTED',
+            properties: { cost: { property: 'strength', defaultValue: 0.5 } }
+          },
+          OWNS: {
+            orientation: 'UNDIRECTED',
+            properties: { cost: { defaultValue: 0.4 } }
+          },
+          WORKS_FOR: {
+            orientation: 'UNDIRECTED',
+            properties: { cost: { defaultValue: 0.3 } }
+          },
+          PROOF_NEAR: {
+            orientation: 'UNDIRECTED',
+            properties: { cost: { defaultValue: 0.5 } }
+          }
+        },
+        sourceNode: $from,
+        targetNode: $to,
+        relationshipWeightProperty: 'cost'
+      })
+      YIELD totalCost, nodeIds, costs
+      RETURN totalCost,
+             [nId IN nodeIds | gds.util.asNode(nId)] AS pathNodes,
+             costs
+    `, { from: fromId, to: toId });
+
+    if (!r.records.length) return res.json({ found: false });
+
+    const rec = r.records[0];
+    return res.json({
+      found:      true,
+      source:     'gds_dijkstra',
+      totalCost:  toPlain(rec.get('totalCost')),
+      pathNodes:  rec.get('pathNodes').map(nodeToObj),
+      costs:      rec.get('costs').map(toPlain),
+    });
+  } catch (err) {
+    if (!gdsErr(err) && !err.message?.includes('no path')) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  // Fallback: Cypher shortestPath with cost reduction via REDUCE
+  try {
+    const r = await run(`
+      MATCH (a), (b) WHERE id(a) = $from AND id(b) = $to
+      MATCH path = shortestPath((a)-[*1..8]-(b))
+      WITH path,
+           reduce(cost = 0.0, r IN relationships(path) |
+             cost + CASE type(r)
+               WHEN 'CONNECTED_TO' THEN toFloat(COALESCE(r.strength, 0.5))
+               WHEN 'WORKS_FOR'    THEN 0.3
+               WHEN 'OWNS'         THEN 0.4
+               WHEN 'PROOF_NEAR'   THEN 0.5
+               WHEN 'LOCATED_IN'   THEN 0.7
+               ELSE 0.8
+             END
+           ) AS totalCost
+      RETURN
+        [n IN nodes(path)          | n]       AS pathNodes,
+        [r IN relationships(path)  | type(r)] AS relTypes,
+        totalCost
+      ORDER BY totalCost ASC
+      LIMIT 3
+    `, { from: fromId, to: toId });
+
+    if (!r.records.length) return res.json({ found: false });
+
+    const paths = r.records.map(rec => ({
+      totalCost: toPlain(rec.get('totalCost')),
+      pathNodes: rec.get('pathNodes').map(nodeToObj),
+      relTypes:  rec.get('relTypes'),
+    }));
+
+    res.json({
+      found:    true,
+      source:   'cypher_shortestpath',
+      ...paths[0],
+      alternates: paths.slice(1),
+    });
+  } catch (inner) {
+    res.status(500).json({ error: inner.message });
+  }
+});
+
+// ── GDS Write-back: persist scores to node properties ────────
+// POST /api/gds/write
+// Runs GDS algorithms in write mode and stores results as node properties:
+//   connector_score   (betweenness)
+//   influence_score   (pagerank)
+//   community_id      (louvain)
+// These properties can then be used in scoring queries and dashboards.
+app.post('/api/gds/write', async (req, res) => {
+  const results = {};
+  const errors  = {};
+
+  // Write betweenness → Person.connector_score
+  try {
+    const r = await run(`
+      CALL gds.betweenness.write({
+        nodeProjection: ['Person','Company'],
+        relationshipProjection: {
+          CONNECTED_TO: { orientation: 'UNDIRECTED' },
+          WORKS_FOR:    { orientation: 'UNDIRECTED' }
+        },
+        writeProperty: 'connector_score'
+      })
+      YIELD nodePropertiesWritten, computeMillis
+      RETURN nodePropertiesWritten, computeMillis
+    `);
+    const rec = r.records[0];
+    results.betweenness = {
+      property: 'connector_score',
+      nodesWritten: toPlain(rec.get('nodePropertiesWritten')),
+      ms: toPlain(rec.get('computeMillis')),
+    };
+  } catch (err) {
+    errors.betweenness = gdsErr(err) ? 'GDS not available' : err.message;
+    // Fallback: write degree centrality as connector_score
+    try {
+      await run(`
+        MATCH (p:Person)
+        WITH p, SIZE([(p)-[:CONNECTED_TO]-() | 1]) AS degree
+        SET p.connector_score = toFloat(degree)
+      `);
+      results.betweenness = { property: 'connector_score', source: 'degree_fallback' };
+    } catch (_) {}
+  }
+
+  // Write pagerank → *.influence_score
+  try {
+    const r = await run(`
+      CALL gds.pageRank.write({
+        nodeProjection: ['Person','Property','Company','ProofProject'],
+        relationshipProjection: {
+          OWNS: { orientation: 'NATURAL' }, CONNECTED_TO: { orientation: 'NATURAL' },
+          WORKS_FOR: { orientation: 'NATURAL' }, MANAGES: { orientation: 'NATURAL' },
+          PROOF_NEAR: { orientation: 'NATURAL' }
+        },
+        dampingFactor: 0.85, maxIterations: 20,
+        writeProperty: 'gds_pagerank'
+      })
+      YIELD nodePropertiesWritten, computeMillis
+      RETURN nodePropertiesWritten, computeMillis
+    `);
+    const rec = r.records[0];
+    results.pagerank = {
+      property: 'gds_pagerank',
+      nodesWritten: toPlain(rec.get('nodePropertiesWritten')),
+      ms: toPlain(rec.get('computeMillis')),
+    };
+  } catch (err) {
+    errors.pagerank = gdsErr(err) ? 'GDS not available' : err.message;
+  }
+
+  // Write louvain → *.community_id
+  try {
+    const r = await run(`
+      CALL gds.louvain.write({
+        nodeProjection: ['Person','Property','Company','Market'],
+        relationshipProjection: {
+          CONNECTED_TO: { orientation: 'UNDIRECTED' }, OWNS: { orientation: 'UNDIRECTED' },
+          WORKS_FOR:    { orientation: 'UNDIRECTED' }, LOCATED_IN: { orientation: 'UNDIRECTED' }
+        },
+        writeProperty: 'community_id'
+      })
+      YIELD nodePropertiesWritten, computeMillis, communityCount
+      RETURN nodePropertiesWritten, computeMillis, communityCount
+    `);
+    const rec = r.records[0];
+    results.louvain = {
+      property: 'community_id',
+      nodesWritten: toPlain(rec.get('nodePropertiesWritten')),
+      communities: toPlain(rec.get('communityCount')),
+      ms: toPlain(rec.get('computeMillis')),
+    };
+  } catch (err) {
+    errors.louvain = gdsErr(err) ? 'GDS not available' : err.message;
+  }
+
+  const hasGds = Object.keys(errors).length === 0 || Object.values(errors).some(e => !String(e).includes('GDS not available'));
+  res.json({ ok: true, gds_available: hasGds, written: results, errors });
+});
+
 // ── Static (production build) ────────────────────────────────
 const __filename = fileURLToPath(import.meta.url);
 const __dir      = path.dirname(__filename);

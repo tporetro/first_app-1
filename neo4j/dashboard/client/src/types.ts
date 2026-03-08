@@ -142,6 +142,113 @@ export interface Stats {
   relationships: { type: string;  count: number }[];
 }
 
+// ── GDS result types ─────────────────────────────────────────
+
+/** Shared envelope for GDS endpoints */
+export interface GdsResponse<T> {
+  algorithm: string;
+  source:    string;       // 'gds' | 'cypher_degree_approx' | etc.
+  gds?:      boolean;      // false when GDS plugin not available
+  reason?:   string;
+}
+
+// 1. Betweenness Centrality
+export interface BetweennessRow {
+  id:               string;
+  name:             string;
+  type:             string;
+  role:             string | null;
+  email:            string | null;
+  trust_score:      number | null;
+  influence_score:  number | null;
+  betweenness_score: number;
+  approximated:     boolean;
+}
+export interface BetweennessResult extends GdsResponse<BetweennessRow> {
+  rows: BetweennessRow[];
+}
+
+// 2. PageRank
+export interface PageRankRow {
+  id:               string;
+  name:             string;
+  type:             string;
+  role:             string | null;
+  asset_type:       string | null;
+  opportunity_score: number | null;
+  pagerank_score:   number;
+  approximated:     boolean;
+}
+export interface PageRankResult extends GdsResponse<PageRankRow> {
+  rows: PageRankRow[];
+}
+
+// 3. Community Detection
+export interface CommunityRow {
+  communityId:     number;
+  size:            number;
+  sample_names:    string[];
+  node_ids:        string[];
+  person_count:    number;
+  property_count:  number;
+  market_count:    number;
+  company_count:   number;
+  hint_asset_type: string | null;
+  hint_market:     string | null;
+  avg_opp_score:   number;
+  approximated:    boolean;
+}
+export interface CommunityResult extends GdsResponse<CommunityRow> {
+  communities: CommunityRow[];
+}
+
+// 4. Node Similarity
+export interface SimilarityPair {
+  id1:         string;
+  name1:       string;
+  type1:       string;
+  role1:       string | null;
+  asset_type1: string | null;
+  score1:      number | null;
+  id2:         string;
+  name2:       string;
+  type2:       string;
+  role2:       string | null;
+  asset_type2: string | null;
+  score2:      number | null;
+  similarity:  number;
+}
+export interface SimilarityResult extends GdsResponse<SimilarityPair> {
+  mode:  string;
+  pairs: SimilarityPair[];
+}
+
+// 5. Weighted Dijkstra
+export interface PathResult {
+  found:      boolean;
+  source?:    string;
+  totalCost?: number;
+  pathNodes?: {
+    id: string; name: string; type: string;
+    [k: string]: unknown;
+  }[];
+  costs?:     number[];
+  relTypes?:  string[];
+  alternates?: {
+    totalCost: number;
+    pathNodes: PathResult['pathNodes'];
+    relTypes: string[];
+  }[];
+}
+
+// GDS write-back
+export interface GdsWriteResult {
+  ok:            boolean;
+  gds_available: boolean;
+  written: Record<string, { property: string; nodesWritten?: number; communities?: number; ms?: number; source?: string }>;
+  errors:  Record<string, string>;
+}
+
 // ── View modes ───────────────────────────────────────────────
 
-export type ViewMode = 'graph' | 'opportunities' | 'connectors' | 'pipeline' | 'actions';
+export type ViewMode = 'graph' | 'opportunities' | 'connectors' | 'pipeline' | 'actions' | 'gds';
