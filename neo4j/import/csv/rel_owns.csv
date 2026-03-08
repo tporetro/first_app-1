@@ -1,0 +1,16 @@
+from_person_id,from_company_id,property_id,ownership_type,ownership_pct,acquired_date,notes
+P012,C010,PR001,Direct,100,2019-06-15,Direct ownership via LLC
+P004,C003,PR002,Direct,100,2017-03-22,Retail strip portfolio asset
+P001,C001,PR003,REIT,100,2021-09-10,REIT held - Class A
+P004,C003,PR004,Direct,100,2018-11-30,Retail portfolio
+P001,C001,PR005,REIT,100,2015-07-08,REIT held - industrial
+P014,C012,PR006,Direct,100,2020-02-14,Post-Harvey acquisition
+P011,C009,PR007,Direct,100,2022-05-20,Industrial - border market
+P007,C006,PR008,Direct,100,2016-08-19,PM firm owns asset
+P006,C005,PR009,Trust,100,2023-01-15,Trust-held office
+P010,C008,PR010,Private Equity,100,2019-12-01,Value-add hold
+P015,C013,PR011,Direct,100,2024-03-10,Post-Ida acquisition
+P003,,PR012,Direct,100,2013-05-28,Absentee individual owner
+P005,C004,PR013,Direct,100,2020-10-22,Developer-owned flex
+P004,C003,PR014,Direct,100,2017-06-30,Medical office portfolio
+P008,,PR015,Direct,100,2014-09-15,Individual owner - large industrial

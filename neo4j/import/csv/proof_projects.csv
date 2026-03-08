@@ -1,0 +1,11 @@
+proof_project_id,name,project_type,project_value,completion_date,roi,value_added,before_value,after_value,property_id,contractor_company_id,owner_person_id,duration_months,storm_triggered,notes
+PP001,Westchase Flex Roof Replacement,Roof Replacement,380000,2022-08-15,0.34,1450000,3800000,5250000,PR001,C015,P012,3,true,TPO replacement post-hail - NOI up 18% post-renovation
+PP002,Alamo Plaza Facade + Roof,Roof + Facade,520000,2023-04-20,0.28,1200000,2900000,4100000,PR004,C014,P004,5,true,Mod-bit to TPO - new anchor tenant signed post-renovation
+PP003,Deep Ellum Adaptive Reuse,Adaptive Reuse,1100000,2024-01-10,0.42,2800000,3900000,6700000,PR010,C011,P010,12,false,Historic warehouse to creative office - full reposition
+PP004,Mueller Flex Roof Repair,Roof Repair,95000,2023-09-30,0.18,480000,3300000,3780000,PR013,C015,P005,2,true,Partial TPO repair - maintained occupancy throughout
+PP005,Meyerland Retail Rebuild,Roof + Structural,640000,2021-11-05,0.51,1900000,1400000,3300000,PR012,C014,P003,8,true,Post-Harvey rebuild - full roof and interior renovation
+PP006,North Loop Retail Re-Roof,Roof Replacement,290000,2024-06-15,0.39,1050000,2400000,3450000,PR002,C015,P004,4,true,38-yr built-up to modified bitumen - occupancy from 68% to 91%
+PP007,Medical Office Repositioning,Roof + Interior,430000,2023-07-22,0.31,920000,2100000,3020000,PR014,C014,P004,6,true,Mod-bit replacement + HVAC - medical tenant retained
+PP008,Fort Worth Office Roof,Roof Replacement,265000,2024-02-28,0.22,590000,2700000,3290000,PR008,C015,P007,3,true,Built-up to TPO - storm claim partially funded renovation
+PP009,Humble Industrial Repair,Roof Repair,180000,2023-12-01,0.15,380000,5900000,6280000,PR015,C014,P008,2,true,Emergency repair post-hail - full replacement pending
+PP010,Southpark Warehouse Re-Roof,Roof Replacement,410000,2024-08-10,0.29,1100000,3800000,4900000,PR005,C015,P001,4,false,Metal panel to TPO - sealed penetrations - energy savings

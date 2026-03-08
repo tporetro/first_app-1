@@ -1,0 +1,16 @@
+company_id,name,type,state,city,founded_year,employee_count,annual_revenue,hq_address,website,notes
+C001,Capital Property Group,REIT,TX,Austin,2005,120,45000000,100 Congress Ave Suite 800,capitalprop.com,Publicly traded mid-size REIT
+C002,Nexus Real Estate,Brokerage,TX,Houston,2010,35,8000000,1200 Smith St Suite 1600,nexusre.com,Boutique commercial brokerage
+C003,Okafor Holdings LLC,Private Equity,TX,San Antonio,2008,15,22000000,888 E Commerce St,okaforholdings.com,Family office - retail focused
+C004,Llewelyn Development,Developer,TX,Austin,2012,28,31000000,701 Brazos St,llewelyndev.com,Mixed-use and multifamily
+C005,Nair Family Trust,Trust,TX,Plano,2001,3,12000000,5000 Legacy Dr Suite 400,—,Office portfolio 200k sqft
+C006,Drummond Properties,Property Management,TX,Fort Worth,2003,52,6500000,301 Commerce St,drumprop.com,Third-party PM firm
+C007,Vermilion Real Estate,Brokerage,TX,Houston,2007,18,4200000,2800 Post Oak Blvd Suite 4100,vermilionre.com,Storm-recovery specialty desk
+C008,Schwartz Capital,Private Equity,TX,Dallas,2000,22,67000000,2200 Ross Ave Suite 3700,schwarzcap.com,Distressed and value-add
+C009,Mendoza Group,Owner-Operator,TX,McAllen,2015,11,9800000,4200 N 10th St,mendozagroup.com,Industrial and logistics
+C010,Carver Assets LLC,Owner-Operator,TX,Houston,2011,8,7300000,3200 Wilcrest Dr Suite 300,—,Flex and light industrial
+C011,Yuen Ventures,Developer,TX,Austin,2014,19,28000000,515 Congress Ave Suite 1900,yuenventures.com,Class A office and mixed-use
+C012,Harrington CRE,Brokerage,TX,Katy,2009,12,3100000,2300 Mason Rd Suite 210,hcre.com,Suburban CRE specialist
+C013,Bayou Real Estate,Owner-Operator,LA,New Orleans,2006,9,5400000,650 Poydras St Suite 1400,bayoure.com,Post-disaster recovery experience
+C014,Texas Storm Restoration,Contractor,TX,Houston,2018,85,14000000,7400 Gulf Freeway,txstormrestore.com,Insurance restoration contractor
+C015,Gulf Coast Roofing Partners,Contractor,TX,Houston,2013,140,19000000,5500 Westpark Dr,gulfcoastroofing.com,Commercial roofing specialist

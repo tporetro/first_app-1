@@ -1,0 +1,11 @@
+market_id,name,state,metro_area,avg_cap_rate,avg_price_per_sqft,vacancy_rate,growth_rate,population,median_income,storm_risk_score,hail_events_5yr,flood_zone_pct,notes
+M001,Houston,TX,Houston-The Woodlands-Sugar Land,0.062,165,0.14,0.031,2350000,58000,88,12,0.22,High storm exposure - hurricane and hail corridor
+M002,Austin,TX,Austin-Round Rock-Georgetown,0.051,285,0.09,0.058,1050000,74000,62,7,0.08,High growth - tech driven - moderate storm risk
+M003,San Antonio,TX,San Antonio-New Braunfels,0.065,140,0.12,0.038,880000,52000,71,9,0.11,Steady market - hail prone - affordable entry points
+M004,McAllen,TX,McAllen-Edinburg-Mission,0.072,95,0.08,0.041,350000,38000,58,5,0.15,Border market - industrial demand - lower values
+M005,Fort Worth,TX,Dallas-Fort Worth-Arlington,0.063,155,0.13,0.042,960000,61000,75,10,0.09,DFW secondary - hail events increasing - value-add plays
+M006,Dallas,TX,Dallas-Fort Worth-Arlington,0.059,195,0.11,0.044,1310000,66000,74,10,0.08,DFW core - strong liquidity - competitive
+M007,New Orleans,LA,New Orleans-Metairie,0.068,120,0.16,0.018,390000,47000,91,4,0.38,Hurricane corridor - flood zone exposure - distressed plays
+M008,Katy,TX,Houston-The Woodlands-Sugar Land,0.060,175,0.10,0.045,310000,82000,80,11,0.18,Houston suburb - Harvey impacted - recovery growth
+M009,Humble,TX,Houston-The Woodlands-Sugar Land,0.066,130,0.15,0.029,75000,56000,85,12,0.28,Flood-prone - industrial corridor - high risk/reward
+M010,Plano,TX,Dallas-Fort Worth-Arlington,0.055,220,0.08,0.036,290000,86000,65,9,0.05,North Dallas suburb - affluent - stable and competitive

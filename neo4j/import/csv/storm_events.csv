@@ -1,0 +1,11 @@
+storm_id,name,event_type,event_date,state,affected_cities,severity,hail_size,wind_speed,estimated_damage,insurance_claims,properties_affected,notes
+S001,Harvey 2017,Hurricane,2017-08-25,TX,"Houston,Katy,Humble,Beaumont",10,0.0,130,125000000000,500000,85000,Category 4 - catastrophic flooding and wind
+S002,Hailstorm H-TX-2021-04,Hail,2021-04-28,TX,"Houston,Katy,Pearland",7,2.5,65,1200000000,38000,12000,Golf ball hail - widespread roof damage
+S003,Hailstorm H-TX-2023-05,Hail,2023-05-19,TX,"Dallas,Fort Worth,Arlington",8,3.0,72,1800000000,52000,18000,Baseball-size hail - record DFW event
+S004,Winter Storm Uri,Ice Storm,2021-02-15,TX,"Dallas,Houston,Austin,San Antonio",9,0.0,25,195000000000,600000,200000,Unprecedented freeze - pipe bursts and roof collapse
+S005,Ida 2021,Hurricane,2021-08-29,LA,"New Orleans,Metairie,Kenner",9,0.0,150,75000000000,280000,60000,Category 4 - post-Katrina levee test
+S006,Hailstorm H-TX-2024-04,Hail,2024-04-26,TX,"San Antonio,New Braunfels,Seguin",7,2.25,58,890000000,28000,9500,Large hail corridor - I-35 to Seguin
+S007,Hailstorm H-TX-2022-06,Hail,2022-06-12,TX,"Austin,Round Rock,Cedar Park",6,1.75,48,620000000,19000,7200,Nickel to quarter-size hail - Central Austin
+S008,Tropical Storm Beta,Tropical Storm,2020-09-22,TX,"Houston,Galveston,Pasadena",5,0.0,55,2200000000,45000,22000,Slow-moving - extreme rainfall - flooding
+S009,Hailstorm H-TX-2025-03,Hail,2025-03-14,TX,"Houston,Sugar Land,Missouri City",8,2.75,68,1400000000,44000,16000,SW Houston corridor - newer TPO roofs damaged
+S010,Hailstorm H-TX-2024-09,Hail,2024-09-05,TX,"McAllen,Edinburg,Pharr",5,1.5,42,310000000,9500,3800,Rio Grande Valley hail - industrial roofs hit

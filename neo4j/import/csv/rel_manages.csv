@@ -1,0 +1,6 @@
+person_id,company_id,property_id,management_type,since_date,fee_pct,notes
+P007,C006,PR008,Full Service,2016-08-19,0.05,3rd party PM
+P007,C006,PR001,Asset Management,2020-01-01,0.04,Contract PM for Carver
+P008,C007,PR015,Asset Management,2015-03-01,0.045,Vermilion manages Humble industrial
+P009,,PR003,Leasing,2022-06-01,0.03,Sunbelt CRE - leasing only
+P014,C012,PR006,Full Service,2020-02-14,0.05,Owner-operator managing own asset

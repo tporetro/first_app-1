@@ -1,0 +1,22 @@
+user_id,property_id,action_type,action_date,notes
+U001,PR002,VIEWED_OPPORTUNITY,2026-02-15,Admin review - flagged for outreach
+U001,PR012,VIEWED_OPPORTUNITY,2026-02-15,Admin review - high priority
+U001,PR015,GENERATED_REPORT,2026-02-16,Full opportunity report generated
+U002,PR001,VIEWED_OPPORTUNITY,2026-02-20,Houston focus - Westchase flex
+U002,PR002,VIEWED_OPPORTUNITY,2026-02-20,High score - North Loop retail
+U002,PR002,REQUESTED_INSPECTION,2026-02-21,Inspection scheduled for March
+U002,PR006,VIEWED_OPPORTUNITY,2026-02-22,Katy flex - post-Harvey
+U002,PR015,VIEWED_OPPORTUNITY,2026-02-18,Humble industrial - high score
+U002,PR015,GENERATED_REPORT,2026-02-19,Full opportunity report generated
+U003,PR003,VIEWED_OPPORTUNITY,2026-02-25,Austin office - low opportunity
+U003,PR005,VIEWED_OPPORTUNITY,2026-02-25,Southpark warehouse - moderate score
+U003,PR013,VIEWED_OPPORTUNITY,2026-02-26,Mueller flex - good prospect
+U003,PR004,VIEWED_OPPORTUNITY,2026-02-27,SA retail - Okafor Holdings
+U003,PR004,REQUESTED_INSPECTION,2026-02-28,Roof inspection scheduled
+U004,PR011,VIEWED_OPPORTUNITY,2026-02-10,New Orleans - post-Ida
+U004,PR012,VIEWED_OPPORTUNITY,2026-02-11,Houston Meyerland - absentee owner
+U004,PR012,GENERATED_REPORT,2026-02-12,Report sent to outreach team
+U004,PR015,VIEWED_OPPORTUNITY,2026-02-13,Humble industrial - flood + hail
+U005,PR007,VIEWED_OPPORTUNITY,2026-03-01,McAllen industrial - border market
+U005,PR009,VIEWED_OPPORTUNITY,2026-03-01,Plano office - low opportunity
+U005,PR010,VIEWED_OPPORTUNITY,2026-03-02,Deep Ellum mixed use

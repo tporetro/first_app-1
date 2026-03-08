@@ -1,0 +1,16 @@
+property_id,market_id,distance_to_market_center_miles,submarket
+PR001,M001,12.4,Westchase
+PR002,M001,8.2,North Loop / Spring Branch
+PR003,M002,0.5,Central Business District
+PR004,M003,6.8,Northwest San Antonio
+PR005,M002,5.1,South Congress / Slaughter
+PR006,M008,2.1,Katy Freeway Corridor
+PR007,M004,3.4,North McAllen
+PR008,M005,9.7,Southwest Fort Worth
+PR009,M010,4.2,West Plano Corridor
+PR010,M006,3.1,Deep Ellum
+PR011,M007,1.8,Warehouse District
+PR012,M001,11.6,Meyerland
+PR013,M002,4.3,Mueller / East Austin
+PR014,M003,8.9,Northeast Medical Center
+PR015,M009,2.7,Humble Industrial Corridor

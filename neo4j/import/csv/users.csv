@@ -1,0 +1,6 @@
+user_id,name,email,role,created_at,last_login,tracked_markets,notes
+U001,Alex Rivera,arivera@opportunityiq.com,Admin,2024-01-01,2026-03-07,"M001,M002,M003",System admin - full access
+U002,Morgan Patel,mpatel@opportunityiq.com,Analyst,2024-02-15,2026-03-07,"M001,M005,M006",Focuses on DFW and Houston storm recovery
+U003,Casey Thornton,cthornton@opportunityiq.com,Scout,2024-03-01,2026-03-06,"M002,M003",Austin and San Antonio market scout
+U004,Jordan Kim,jkim@opportunityiq.com,Analyst,2024-04-10,2026-03-05,"M007,M001",Gulf Coast storm specialist
+U005,Taylor Brooks,tbrooks@opportunityiq.com,Scout,2024-05-20,2026-03-04,"M004,M010",Border market and North Dallas coverage
