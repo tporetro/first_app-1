@@ -1,0 +1,49 @@
+<h1><%= @leader.name %> — Extended Network</h1>
+<p style="color:#7f8c8d; margin-bottom:20px;">
+  <%= @leader.name %>'s reachable network within <%= @hops %> degrees of separation.
+  These are the contacts you can reach via warm introduction — a core B2B strategy.
+</p>
+
+<div style="margin-bottom: 20px; display: flex; gap: 8px; align-items: center;">
+  <strong style="font-size:0.85rem; color:#7f8c8d;">Hops:</strong>
+  <%= link_to "1°", network_business_leader_path(@leader, hops: 1),
+      style: @hops == 1 ? "background:#1a6fa0;color:white;padding:4px 12px;border-radius:12px;" : "padding:4px 12px;" %>
+  <%= link_to "2°", network_business_leader_path(@leader, hops: 2),
+      style: @hops == 2 ? "background:#1a6fa0;color:white;padding:4px 12px;border-radius:12px;" : "padding:4px 12px;" %>
+  <%= link_to "3°", network_business_leader_path(@leader, hops: 3),
+      style: @hops == 3 ? "background:#1a6fa0;color:white;padding:4px 12px;border-radius:12px;" : "padding:4px 12px;" %>
+</div>
+
+<div class="stat-row" style="margin-bottom: 24px;">
+  <div class="stat-box">
+    <div class="number"><%= @network_leaders.length %></div>
+    <div class="label">Reachable leaders</div>
+  </div>
+  <div class="stat-box">
+    <div class="number"><%= @network_leaders.map { |l| l.respond_to?(:company_name) ? l.company_name : nil }.compact.uniq.length %></div>
+    <div class="label">Companies reachable</div>
+  </div>
+</div>
+
+<div class="leader-grid">
+  <% @network_leaders.each do |leader| %>
+    <div class="leader-card">
+      <h3><%= link_to leader.name, business_leader_path(leader) %></h3>
+      <div class="title"><%= leader.title %></div>
+      <% if leader.respond_to?(:company_name) && leader.company_name.present? %>
+        <div class="company"><%= leader.company_name %></div>
+      <% end %>
+      <div style="margin-top: 8px; font-size: 0.82rem;">
+        <%= link_to "Find path →", path_business_leader_path(@leader, target_id: leader.id) %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @network_leaders.empty? %>
+  <p class="empty">No connections found within <%= @hops %> degrees.</p>
+<% end %>
+
+<div style="margin-top: 24px;">
+  <%= link_to "← Back to profile", business_leader_path(@leader) %>
+</div>

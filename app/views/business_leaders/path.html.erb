@@ -1,0 +1,49 @@
+<h1>Introduction Path</h1>
+<p style="color:#7f8c8d; margin-bottom:24px;">
+  The shortest connection chain between
+  <strong><%= @leader.name %></strong> and <strong><%= @target.name %></strong>.
+</p>
+
+<% if @path.any? %>
+  <div class="card">
+    <div style="font-size: 0.85rem; color:#7f8c8d; margin-bottom: 12px;">
+      <span class="badge badge-degree"><%= @degrees %> degree<%= @degrees == 1 ? '' : 's' %> of separation</span>
+    </div>
+
+    <div class="path-chain">
+      <% @path.each_with_index do |node, i| %>
+        <div class="path-node">
+          <strong><%= link_to node.name, business_leader_path(node) %></strong><br>
+          <span style="font-size:0.78rem; color:#7f8c8d;">
+            <%= node.title %>
+            <% if node.respond_to?(:company_name) && node.company_name.present? %>
+              &middot; <%= node.company_name %>
+            <% end %>
+          </span>
+        </div>
+        <% unless i == @path.length - 1 %>
+          <span class="path-arrow">→</span>
+        <% end %>
+      <% end %>
+    </div>
+
+    <p style="font-size:0.85rem; color:#7f8c8d; margin-top: 16px;">
+      To reach <strong><%= @target.name %></strong>, ask
+      <% if @path.length > 2 %>
+        <strong><%= @path[1].name %></strong>
+        <% if @path.length > 3 %> to forward the introduction via the chain above<% else %> to make the introduction<% end %>.
+      <% else %>
+        you are already directly connected.
+      <% end %>
+    </p>
+  </div>
+<% else %>
+  <div class="card">
+    <p class="empty">No path found between these two leaders within 6 degrees of separation.</p>
+  </div>
+<% end %>
+
+<div style="margin-top: 16px; display: flex; gap: 16px;">
+  <%= link_to "← Back to #{@leader.name}", business_leader_path(@leader) %>
+  <%= link_to "#{@target.name}'s profile →", business_leader_path(@target) %>
+</div>

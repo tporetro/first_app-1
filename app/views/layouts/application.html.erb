@@ -1,14 +1,64 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>FirstApp</title>
+  <title>Business Leader Network</title>
   <%= stylesheet_link_tag    "application", media: "all", "data-turbolinks-track" => true %>
   <%= javascript_include_tag "application", "data-turbolinks-track" => true %>
   <%= csrf_meta_tags %>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: #f5f7fa; color: #2c3e50; }
+    .navbar { background: #1a2a4a; color: white; padding: 14px 24px; display: flex; align-items: center; gap: 32px; }
+    .navbar .brand { font-size: 1.2rem; font-weight: 700; color: #5dade2; text-decoration: none; letter-spacing: 0.5px; }
+    .navbar a { color: #cdd8e8; text-decoration: none; font-size: 0.9rem; }
+    .navbar a:hover { color: white; }
+    .container { max-width: 1100px; margin: 32px auto; padding: 0 20px; }
+    .card { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); padding: 24px; margin-bottom: 20px; }
+    .card h2 { margin: 0 0 16px; font-size: 1.1rem; color: #1a2a4a; }
+    h1 { font-size: 1.6rem; color: #1a2a4a; margin: 0 0 24px; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+    .badge-industry { background: #e8f4fd; color: #1a6fa0; }
+    .badge-degree { background: #e8fdf4; color: #1a6f4a; }
+    .leader-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .leader-card { background: white; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); padding: 18px; border-left: 4px solid #5dade2; }
+    .leader-card h3 { margin: 0 0 4px; font-size: 1rem; }
+    .leader-card .title { font-size: 0.85rem; color: #7f8c8d; margin-bottom: 6px; }
+    .leader-card .company { font-size: 0.85rem; color: #1a6fa0; font-weight: 500; }
+    .stat-row { display: flex; gap: 20px; flex-wrap: wrap; }
+    .stat-box { background: white; border-radius: 8px; padding: 20px 28px; text-align: center; box-shadow: 0 1px 6px rgba(0,0,0,0.07); flex: 1; min-width: 120px; }
+    .stat-box .number { font-size: 2rem; font-weight: 700; color: #5dade2; }
+    .stat-box .label  { font-size: 0.8rem; color: #7f8c8d; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th { text-align: left; border-bottom: 2px solid #edf2f7; padding: 8px 12px; color: #7f8c8d; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f0f4f8; }
+    tr:last-child td { border-bottom: none; }
+    a { color: #1a6fa0; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .path-chain { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+    .path-node { background: #e8f4fd; border-radius: 6px; padding: 8px 14px; font-size: 0.88rem; border: 1px solid #b3d7f0; }
+    .path-arrow { color: #5dade2; font-weight: bold; font-size: 1.2rem; }
+    .search-bar { display: flex; gap: 10px; margin-bottom: 24px; }
+    .search-bar input { flex: 1; padding: 10px 14px; border: 1px solid #d5dce6; border-radius: 6px; font-size: 0.95rem; }
+    .search-bar button { padding: 10px 20px; background: #5dade2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+    .search-bar button:hover { background: #3498db; }
+    .influence-bar { display: inline-block; height: 6px; background: #5dade2; border-radius: 3px; vertical-align: middle; margin-right: 8px; }
+    .section-title { font-size: 0.95rem; font-weight: 700; color: #4a5568; text-transform: uppercase; letter-spacing: 0.5px; margin: 24px 0 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+    .empty { color: #aab; font-style: italic; font-size: 0.9rem; padding: 16px 0; }
+  </style>
 </head>
 <body>
 
-<%= yield %>
+<nav class="navbar">
+  <%= link_to "Business Leader Network", network_path, class: "brand" %>
+  <%= link_to "Leaders",      business_leaders_path %>
+  <%= link_to "Companies",    companies_path %>
+  <%= link_to "Top Connectors", top_connectors_network_path %>
+  <%= link_to "By Industry",  by_industry_network_path %>
+</nav>
+
+<div class="container">
+  <%= yield %>
+</div>
 
 </body>
 </html>

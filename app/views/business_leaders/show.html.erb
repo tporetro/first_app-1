@@ -1,0 +1,89 @@
+<div style="display: flex; align-items: flex-start; gap: 32px; flex-wrap: wrap;">
+  <div style="flex: 2; min-width: 280px;">
+    <h1 style="margin-bottom: 4px;"><%= @leader.name %></h1>
+    <div style="font-size: 1.05rem; color: #7f8c8d; margin-bottom: 8px;"><%= @leader.title %></div>
+    <% if @current_company %>
+      <div style="margin-bottom: 12px;">
+        <%= link_to @current_company.name, company_path(@current_company) %> &middot;
+        <span class="badge badge-industry"><%= @current_company.industry %></span>
+        <span style="color:#aaa; font-size:0.82rem;"> <%= @current_company.hq_city %></span>
+      </div>
+    <% end %>
+    <% if @leader.bio.present? %>
+      <p style="color:#4a5568; font-size:0.95rem;"><%= @leader.bio %></p>
+    <% end %>
+    <div style="margin-top: 16px; display: flex; gap: 12px;">
+      <%= link_to "View Network (2° hops)", network_business_leader_path(@leader),
+          style: "background:#5dade2;color:white;padding:8px 16px;border-radius:6px;font-size:0.9rem;" %>
+    </div>
+  </div>
+
+  <div style="flex: 1; min-width: 200px;">
+    <div class="card" style="text-align: center; padding: 16px;">
+      <div style="font-size: 2rem; font-weight: 700; color: #5dade2;"><%= @leader.influence_score %></div>
+      <div style="font-size: 0.78rem; color: #7f8c8d; text-transform: uppercase;">Influence Score</div>
+    </div>
+    <div class="card" style="padding: 16px;">
+      <div style="font-size: 0.78rem; color: #7f8c8d; text-transform: uppercase; margin-bottom: 6px;">Find Introduction</div>
+      <%= form_tag path_business_leader_path(@leader), method: :get, style: "display:flex;gap:6px;" do %>
+        <%= text_field_tag :target_id, nil, placeholder: "Target leader ID…",
+            style: "flex:1; padding:6px 10px; border:1px solid #d5dce6; border-radius:4px; font-size:0.85rem;" %>
+        <%= submit_tag "→", style: "padding:6px 12px; background:#1a2a4a; color:white; border:none; border-radius:4px; cursor:pointer;" %>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<div class="section-title">Direct Connections (<%= @connections.length %>)</div>
+<% if @connections.any? %>
+  <div class="leader-grid">
+    <% @connections.each do |conn| %>
+      <div class="leader-card" style="border-left-color: <%= conn.respond_to?(:strength) && conn.strength.to_i >= 8 ? '#2ecc71' : '#5dade2' %>;">
+        <h3><%= link_to conn.name, business_leader_path(conn) %></h3>
+        <div class="title"><%= conn.title %></div>
+        <% if conn.respond_to?(:company_name) && conn.company_name.present? %>
+          <div class="company"><%= conn.company_name %></div>
+        <% end %>
+        <div style="display: flex; gap: 8px; margin-top: 10px; font-size: 0.82rem;">
+          <%= link_to "Mutual connections", mutual_business_leader_path(@leader, other_id: conn.id) %>
+          &middot;
+          <%= link_to "Path", path_business_leader_path(@leader, target_id: conn.id) %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <p class="empty">No direct connections recorded.</p>
+<% end %>
+
+<% if @board_seats.any? %>
+  <div class="section-title">Board Memberships</div>
+  <div class="leader-grid">
+    <% @board_seats.each do |co| %>
+      <div class="leader-card" style="border-left-color: #8e44ad;">
+        <h3><%= link_to co.name, company_path(co) %></h3>
+        <div class="title"><%= co.industry %></div>
+        <div class="company"><%= co.hq_city %></div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<% if @work_history.any? %>
+  <div class="section-title">Work History</div>
+  <div class="card">
+    <table>
+      <thead><tr><th>Company</th><th>Title</th><th>From</th><th>To</th></tr></thead>
+      <tbody>
+        <% @work_history.each do |w| %>
+          <tr>
+            <td><%= w['name'] %></td>
+            <td><%= w['title'] %></td>
+            <td><%= w['from'] %></td>
+            <td><%= w['to'] %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

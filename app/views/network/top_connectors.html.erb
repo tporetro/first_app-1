@@ -1,0 +1,35 @@
+<h1>Top Connectors</h1>
+<p style="color:#7f8c8d; margin-bottom:24px;">
+  These leaders have the highest number of direct connections — the ideal warm-introduction
+  brokers for reaching new B2B prospects across the network.
+</p>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Title</th>
+        <th>Company</th>
+        <th>Connections</th>
+        <th>Influence</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @connectors.each_with_index do |l, i| %>
+        <tr>
+          <td style="color:#aaa;"><%= i + 1 %></td>
+          <td><%= link_to l['name'], business_leader_path(l['id']) %></td>
+          <td><%= l['title'] %></td>
+          <td><%= l['company_name'] %></td>
+          <td><strong><%= l['degree'] %></strong></td>
+          <td>
+            <span class="influence-bar" style="width: <%= [l['influence_score'].to_i, 100].min %>px;"></span>
+            <%= l['influence_score'] %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

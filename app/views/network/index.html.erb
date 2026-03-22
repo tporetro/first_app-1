@@ -1,0 +1,65 @@
+<h1>Network Dashboard</h1>
+
+<div class="stat-row">
+  <div class="stat-box">
+    <div class="number"><%= @stats[:leaders] %></div>
+    <div class="label">Business Leaders</div>
+  </div>
+  <div class="stat-box">
+    <div class="number"><%= @stats[:companies] %></div>
+    <div class="label">Companies</div>
+  </div>
+  <div class="stat-box">
+    <div class="number"><%= @stats[:connections] %></div>
+    <div class="label">Connections</div>
+  </div>
+  <div class="stat-box">
+    <div class="number"><%= @stats[:board_seats] %></div>
+    <div class="label">Board Seats</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top: 28px;">
+  <h2>Top Influencers</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Title</th>
+        <th>Company</th>
+        <th>Influence</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @top_leaders.each do |l| %>
+        <tr>
+          <td><%= link_to l['name'], business_leader_path(l['id']) %></td>
+          <td><%= l['title'] %></td>
+          <td><%= l['company_name'] %></td>
+          <td>
+            <span class="influence-bar" style="width: <%= [l['influence_score'].to_i, 100].min %>px;"></span>
+            <%= l['influence_score'] %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Leaders by Industry</h2>
+  <table>
+    <thead>
+      <tr><th>Industry</th><th>Leaders</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% @industries.each do |row| %>
+        <tr>
+          <td><span class="badge badge-industry"><%= row['industry'] %></span></td>
+          <td><%= row['leader_count'] %></td>
+          <td><%= link_to "Browse →", by_industry_network_path(industry: row['industry']) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
