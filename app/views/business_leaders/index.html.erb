@@ -1,0 +1,27 @@
+<h1>Business Leaders</h1>
+
+<%= form_tag business_leaders_path, method: :get, class: "search-bar" do %>
+  <%= text_field_tag :q, params[:q], placeholder: "Search by name or title…" %>
+  <%= submit_tag "Search" %>
+<% end %>
+
+<div class="leader-grid">
+  <% @leaders.each do |leader| %>
+    <div class="leader-card">
+      <h3><%= link_to leader.name, business_leader_path(leader) %></h3>
+      <div class="title"><%= leader.title %></div>
+      <% if leader.respond_to?(:company_name) && leader.company_name.present? %>
+        <div class="company"><%= leader.company_name %></div>
+      <% end %>
+      <div style="margin-top: 10px; display: flex; gap: 8px;">
+        <%= link_to "Profile",  business_leader_path(leader), style: "font-size:0.82rem;" %>
+        &middot;
+        <%= link_to "Network",  network_business_leader_path(leader), style: "font-size:0.82rem;" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @leaders.empty? %>
+  <p class="empty">No leaders found.</p>
+<% end %>

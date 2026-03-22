@@ -1,0 +1,45 @@
+<h1>Leaders by Industry</h1>
+
+<div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+  <% (@industries || []).each do |row| %>
+    <%= link_to row['industry'], by_industry_network_path(industry: row['industry']),
+        class: "badge badge-industry",
+        style: row['industry'] == @industry ? "background:#1a6fa0;color:white;" : "" %>
+  <% end %>
+</div>
+
+<% if @industry.present? %>
+  <div class="card">
+    <h2><%= @industry %></h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Title</th>
+          <th>Company</th>
+          <th>Connections</th>
+          <th>Influence</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @leaders.each do |l| %>
+          <tr>
+            <td><%= link_to l['name'], business_leader_path(l['id']) %></td>
+            <td><%= l['title'] %></td>
+            <td><%= l['company_name'] %></td>
+            <td><%= l['connections'] %></td>
+            <td>
+              <span class="influence-bar" style="width: <%= [l['influence_score'].to_i, 100].min %>px;"></span>
+              <%= l['influence_score'] %>
+            </td>
+            <td><%= link_to "Network →", network_business_leader_path(l['id']) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <% if @leaders.empty? %>
+      <p class="empty">No leaders found in this industry.</p>
+    <% end %>
+  </div>
+<% end %>

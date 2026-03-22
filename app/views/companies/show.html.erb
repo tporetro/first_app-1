@@ -1,0 +1,62 @@
+<h1><%= @company.name %></h1>
+<div style="display: flex; gap: 12px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+  <span class="badge badge-industry"><%= @company.industry %></span>
+  <span style="color:#7f8c8d;"><%= @company.hq_city %></span>
+  <% if @company.size.present? %>
+    <span style="color:#7f8c8d; font-size:0.85rem;"><%= @company.size %> employees</span>
+  <% end %>
+  <% if @company.website.present? %>
+    <a href="<%= @company.website %>" target="_blank" style="font-size:0.85rem;"><%= @company.website %></a>
+  <% end %>
+</div>
+
+<% if @company.description.present? %>
+  <p style="color:#4a5568; margin-bottom:24px;"><%= @company.description %></p>
+<% end %>
+
+<div class="section-title">Current Employees (<%= @employees.length %>)</div>
+<% if @employees.any? %>
+  <div class="leader-grid">
+    <% @employees.each do |l| %>
+      <div class="leader-card">
+        <h3><%= link_to l.name, business_leader_path(l) %></h3>
+        <div class="title"><%= l.title %></div>
+        <div style="margin-top: 6px; display: flex; gap: 6px; font-size: 0.82rem;">
+          <%= link_to "Network →", network_business_leader_path(l) %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <p class="empty">No current employees recorded.</p>
+<% end %>
+
+<% if @board.any? %>
+  <div class="section-title">Board Members</div>
+  <div class="leader-grid">
+    <% @board.each do |l| %>
+      <div class="leader-card" style="border-left-color: #8e44ad;">
+        <h3><%= link_to l.name, business_leader_path(l) %></h3>
+        <div class="title"><%= l.title %></div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<% if @alumni.any? %>
+  <div class="section-title">Alumni</div>
+  <div class="card">
+    <table>
+      <thead><tr><th>Name</th><th>Title</th><th>Period</th></tr></thead>
+      <tbody>
+        <% @alumni.each do |l| %>
+          <tr>
+            <td><%= link_to l.name, business_leader_path(l) %></td>
+            <td><%= l.respond_to?(:role_title) ? l.role_title : '' %></td>
+            <td style="font-size:0.82rem; color:#7f8c8d;"></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

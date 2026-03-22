@@ -1,0 +1,28 @@
+<h1>Companies</h1>
+
+<div style="margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+  <%= link_to "All", companies_path,
+      style: params[:industry].blank? ? "background:#1a6fa0;color:white;padding:4px 14px;border-radius:12px;" : "padding:4px 14px;color:#1a6fa0;" %>
+  <% @industries.each do |ind| %>
+    <%= link_to ind, companies_path(industry: ind),
+        class: "badge badge-industry",
+        style: params[:industry] == ind ? "background:#1a6fa0;color:white;" : "" %>
+  <% end %>
+</div>
+
+<div class="leader-grid">
+  <% @companies.each do |co| %>
+    <div class="leader-card" style="border-left-color: #8e44ad;">
+      <h3><%= link_to co.name, company_path(co) %></h3>
+      <div class="title"><%= co.hq_city %></div>
+      <div style="margin-top: 6px;">
+        <span class="badge badge-industry"><%= co.industry %></span>
+        <span style="font-size:0.8rem; color:#7f8c8d; margin-left: 8px;"><%= co.size %></span>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @companies.empty? %>
+  <p class="empty">No companies found.</p>
+<% end %>

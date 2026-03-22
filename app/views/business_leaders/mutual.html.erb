@@ -1,0 +1,27 @@
+<h1>Mutual Connections</h1>
+<p style="color:#7f8c8d; margin-bottom: 24px;">
+  People who know both <strong><%= @leader.name %></strong> and <strong><%= @other.name %></strong>.
+</p>
+
+<% if @mutual.any? %>
+  <div class="leader-grid">
+    <% @mutual.each do |m| %>
+      <div class="leader-card">
+        <h3><%= link_to m.name, business_leader_path(m) %></h3>
+        <div class="title"><%= m.title %></div>
+        <% if m.respond_to?(:company_name) && m.company_name.present? %>
+          <div class="company"><%= m.company_name %></div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card">
+    <p class="empty">No mutual connections found.</p>
+  </div>
+<% end %>
+
+<div style="margin-top: 16px; display: flex; gap: 16px;">
+  <%= link_to "← #{@leader.name}", business_leader_path(@leader) %>
+  <%= link_to "#{@other.name} →", business_leader_path(@other) %>
+</div>
