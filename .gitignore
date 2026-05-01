@@ -14,3 +14,9 @@
 # Ignore all logfiles and tempfiles.
 /log/*.log
 /tmp
+
+# Node
+/node_modules
+
+# App data (tracks DB)
+/data/tracks.json
