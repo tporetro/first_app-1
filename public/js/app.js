@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Navigation ────────────────────────────────────────────────
 function setupNav() {
-  document.querySelectorAll('.nav-item').forEach(item => {
+  document.querySelectorAll('.nav-item, .mobile-nav-item').forEach(item => {
     item.addEventListener('click', e => {
       e.preventDefault();
       switchView(item.dataset.view);
@@ -38,7 +38,7 @@ function setupNav() {
 }
 
 function switchView(view) {
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view));
+  document.querySelectorAll('.nav-item, .mobile-nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view));
   document.getElementById('studioView').classList.toggle('hidden', view !== 'studio');
   document.getElementById('libraryView').classList.toggle('hidden', view !== 'library');
   if (view === 'library') renderTracks();
@@ -200,8 +200,10 @@ async function loadTracks() {
 }
 
 function updateTrackCount() {
-  const el = document.getElementById('trackCount');
-  el.textContent = `${tracks.length} track${tracks.length !== 1 ? 's' : ''}`;
+  const label = `${tracks.length} track${tracks.length !== 1 ? 's' : ''}`;
+  document.getElementById('trackCount').textContent = label;
+  const mob = document.getElementById('trackCountMobile');
+  if (mob) mob.textContent = label;
 }
 
 // ── Library Rendering ─────────────────────────────────────────

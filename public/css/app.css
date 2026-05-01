@@ -152,6 +152,164 @@ body {
   .studio-layout { grid-template-columns: 1fr; }
 }
 
+/* ─── Mobile Top Bar (hidden on desktop) ──────────────────── */
+.mobile-topbar {
+  display: none;
+}
+
+/* ─── Mobile Bottom Nav (hidden on desktop) ───────────────── */
+.mobile-bottomnav {
+  display: none;
+}
+
+/* ─── Mobile Layout ────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Reset body scroll lock so content scrolls */
+  body { overflow: auto; height: auto; }
+
+  /* Mobile top bar */
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .mobile-topbar .track-count {
+    font-size: 0.75rem;
+    color: var(--text-3);
+  }
+
+  /* Full-page flex column */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  /* Hide desktop sidebar */
+  .sidebar { display: none; }
+
+  /* Main content fills space between player and bottom nav */
+  .main-content {
+    flex: 1;
+    padding: 20px 16px 16px;
+    overflow-y: visible;
+  }
+
+  .view { max-width: 100%; }
+
+  .view-header { margin-bottom: 20px; }
+  .view-header h1 { font-size: 1.4rem; }
+  .view-subtitle { font-size: 0.825rem; }
+
+  /* Studio: single column, compact */
+  .studio-layout { grid-template-columns: 1fr; gap: 16px; }
+
+  .generate-card { padding: 18px; }
+  .generate-card form { gap: 18px; }
+
+  .prompt-input { font-size: 1rem; } /* prevent iOS zoom on focus */
+
+  .param-row { grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* Chips: bigger tap targets */
+  .chip { padding: 7px 14px; font-size: 0.8rem; }
+
+  .generate-btn { padding: 16px; font-size: 1rem; }
+
+  /* Preview card: reduce min-height */
+  .preview-card { min-height: 200px; padding: 18px; }
+
+  /* Library toolbar: stack on very small screens */
+  .library-toolbar { flex-wrap: wrap; gap: 8px; }
+  .filter-select { flex: 1; min-width: 120px; }
+
+  /* Track grid: single column */
+  .tracks-grid { grid-template-columns: 1fr; gap: 12px; }
+
+  /* Track cards: always show actions on mobile (no hover) */
+  .track-actions {
+    opacity: 1;
+    background: rgba(8,8,15,0.45);
+    backdrop-filter: blur(3px);
+  }
+
+  /* Icon buttons: bigger tap area */
+  .icon-btn { width: 44px; height: 44px; }
+  .icon-btn svg { width: 17px; height: 17px; }
+
+  /* Player bar: compact two-row layout */
+  .player-bar {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    padding: 10px 16px;
+    gap: 8px;
+  }
+
+  .player-info {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  /* Hide oscilloscope waveform on mobile to save space */
+  .player-waveform { display: none; }
+
+  .player-controls {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  /* Bigger play/stop buttons for thumbs */
+  .ctrl-btn { width: 44px; height: 44px; }
+  .ctrl-btn svg { width: 18px; height: 18px; }
+
+  .player-right {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  /* Hide volume on mobile */
+  .volume-wrap { display: none; }
+
+  /* Mobile bottom nav */
+  .mobile-bottomnav {
+    display: flex;
+    background: var(--bg-2);
+    border-top: 1px solid var(--border);
+    position: sticky;
+    bottom: 0;
+    z-index: 100;
+  }
+
+  .mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 10px 8px;
+    color: var(--text-3);
+    text-decoration: none;
+    font-size: 0.7rem;
+    font-weight: 500;
+    transition: color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-nav-item svg { width: 20px; height: 20px; }
+
+  .mobile-nav-item.active { color: var(--primary-2); }
+  .mobile-nav-item.active svg { stroke: var(--primary-2); }
+}
+
 /* ─── Generate Card ────────────────────────────────────────── */
 .generate-card {
   background: var(--bg-card);
