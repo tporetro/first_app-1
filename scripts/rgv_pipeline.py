@@ -146,24 +146,43 @@ AUDIT_LOG_PATH = "pipeline_audit_log.csv"
 # Small HTTP helper (stdlib only, no extra dependencies)
 # ---------------------------------------------------------
 
-def http_request(url, method="GET", headers=None, body=None, timeout=310):
+def http_request(url, method="GET", headers=None, body=None, timeout=310, retry_on_network_error=True):
+    """
+    retry_on_network_error retries transient failures (connection reset,
+    timeout -- NOT HTTPError, which is a real server response) up to 3 times
+    with backoff. Found necessary live: a single "Connection reset by peer"
+    on a GET status-poll crashed an entire in-progress batch with no
+    recovery. Left as an explicit opt-out (not opt-in) because most calls
+    here are safe to retry (GETs, Apify run-start -- a duplicate run just
+    costs a few cents) -- EXCEPT Retell's create-phone-call: if that POST's
+    response is lost to a network error, we can't tell whether the call was
+    actually placed server-side, so blindly retrying risks dialing the same
+    person twice. See place_call(), which passes retry_on_network_error=False.
+    """
     headers = headers or {}
     data = None
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         headers.setdefault("Content-Type", "application/json")
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8")
-            return resp.status, (json.loads(raw) if raw else {})
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8")
+
+    attempts = 3 if retry_on_network_error else 1
+    for attempt in range(1, attempts + 1):
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            parsed = {"raw_error": raw}
-        return e.code, parsed
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8")
+                return resp.status, (json.loads(raw) if raw else {})
+        except urllib.error.HTTPError as e:
+            raw = e.read().decode("utf-8")
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                parsed = {"raw_error": raw}
+            return e.code, parsed
+        except urllib.error.URLError:
+            if attempt == attempts:
+                raise
+            time.sleep(2 ** attempt)  # 2s, 4s
 
 
 # ---------------------------------------------------------
@@ -671,7 +690,10 @@ def place_call(payload, dry_run):
         )
 
     headers = {"Authorization": f"Bearer {RETELL_API_KEY}"}
-    status, resp = http_request(RETELL_CREATE_CALL_URL, method="POST", headers=headers, body=payload)
+    status, resp = http_request(
+        RETELL_CREATE_CALL_URL, method="POST", headers=headers, body=payload,
+        retry_on_network_error=False,  # see http_request docstring -- avoids risk of double-dialing
+    )
     if status not in (200, 201):
         raise RuntimeError(f"Retell call creation failed ({status}): {resp}")
     return resp
