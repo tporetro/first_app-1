@@ -6,9 +6,13 @@ require 'zlib'
 require 'stringio'
 require_relative 'reference_job_matcher'
 
-# Repeating batch pipeline for the RGV/McAllen reference-street campaign:
+# Single-batch pipeline for the RGV/McAllen reference-street campaign:
 #   fetch up to BATCH_SIZE unworked leads -> enrichment gate -> do-not-call gate
-#   -> match against the active jobs list -> push matched leads to Retell -> repeat.
+#   -> match against the active jobs list -> push matched leads to Retell -> stop.
+#
+# Processes exactly one batch per call and returns — by design, not looped. The
+# campaign owner reviews each batch's results and explicitly asks for the next one
+# rather than this running unattended through the whole list.
 #
 # Unmatched (but enriched, DNC-clear) leads are tagged for the standard script and
 # are NOT called from this runner — per the matching spec, a reference-street claim
@@ -36,7 +40,8 @@ class ReferenceStreetCampaignRunner
     @dry_run = dry_run
   end
 
-  # Runs batches of up to BATCH_SIZE until no eligible leads remain.
+  # Processes exactly one batch of up to BATCH_SIZE leads, then returns — call this
+  # again (a fresh invocation) for the next batch once you've reviewed the results.
   # allow_outside_hours: true bypasses the calling-hours gate (for dry runs/tests only).
   def run_batches!(allow_outside_hours: false)
     unless allow_outside_hours || @dry_run || calling_hours?
@@ -49,16 +54,16 @@ class ReferenceStreetCampaignRunner
     puts "[campaign] DRY RUN — no writes to Supabase, no calls placed via Retell.\n\n" if @dry_run
 
     total = { dialed: 0, standard_hail_hook: 0, do_not_call: 0, enrichment_incomplete: 0, duplicate_phone: 0 }
-    loop do
-      batch = fetch_batch
-      break if batch.empty?
-
-      batch.each { |lead| total[process_lead(lead, dnc)] += 1 }
-      puts "[campaign] Processed batch of #{batch.size}."
-      break if @dry_run # fetch_batch filters on call_status/retell_call_id, which dry runs never mutate
+    batch = fetch_batch
+    if batch.empty?
+      puts '[campaign] No eligible leads. Done.'
+      return total
     end
-    puts '[campaign] No more eligible leads. Done.'
+
+    batch.each { |lead| total[process_lead(lead, dnc)] += 1 }
+    puts "[campaign] Processed batch of #{batch.size}."
     puts "[campaign] Summary: #{total}"
+    puts '[campaign] Batch complete — run again for the next 100 when ready.' unless @dry_run
     total
   end
 
