@@ -6,6 +6,10 @@
 
 **Radius note (2026-08-03):** The initial production run against the 69-lead RGV batch used a 1-mile radius and matched only 4/69, all to one job. At MJ's direction the radius was widened to 6 miles for that run (max actual distance across the batch: 5.64 mi — all matches stayed inside the McAllen/Edinburg/Hidalgo metro footprint), which brought coverage to 69/69 across 7 distinct jobs. Flagging since the script's Phase 1 line ("not far from your property") is written for street/same-neighborhood proximity — at the top end of a 6-mile radius that phrasing is a stretch even though the underlying job/insurance/timing facts stay true. Worth revisiting radius vs. script wording together as more active-job coverage comes online.
 
+**Post-call analysis note (2026-08-03):** The Retell agent (`agent_3881fe707b28d339dc848dbef5`) was originally created with only the default `post_call_analysis_model` — none of the Section 3 structured-output fields (`call_disposition`, `contact_verified`, `confirmed_email`, etc.) were actually being extracted; Retell's own `call_successful` metric came back `false` on all 69 calls in the first live run because it had no configured criteria to judge against. Configured `post_call_analysis_data` on the agent with 13 fields matching Section 3 so future calls populate real disposition data. **This does not apply retroactively** — the 69 calls from the first run only have the generic `call_summary`/`user_sentiment`/`in_voicemail` fields, not structured dispositions.
+
+**Duplicate-dial note (2026-08-03):** First live run placed 69 calls across only 27 unique phone numbers — multiple `leads` rows share a `contact_phone` (repeat hail-event entries per property) and nothing deduped before dialing; one number was called 6 times in that single run. `lib/reference_street_campaign_runner.rb` now dedupes by phone (seeded from every lead with a `retell_call_id` already set, so it holds across batches/runs, not just within one) before matching or calling.
+
 This slots into [[storm-lead-automation]] as a new enrichment step, immediately before the Retell push — after property enrichment, before the outbound call is queued.
 
 -----
