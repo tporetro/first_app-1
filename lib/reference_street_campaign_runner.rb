@@ -90,7 +90,9 @@ class ReferenceStreetCampaignRunner
 
     if job.nil?
       log(lead, 'standard_hail_hook — no active job within radius')
-      patch_lead(lead['lead_id'], hook_path_used: 'standard_hail_hook')
+      # call_status must leave 'pending' here too, or fetch_batch's is-null/is-pending
+      # filter keeps re-matching this lead forever since no call ever gets placed for it.
+      patch_lead(lead['lead_id'], hook_path_used: 'standard_hail_hook', call_status: 'routed_standard_script')
       return :standard_hail_hook
     end
 
