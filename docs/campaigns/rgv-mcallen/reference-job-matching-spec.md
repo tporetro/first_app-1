@@ -4,6 +4,8 @@
 
 **Purpose:** Before a lead is pushed to Retell for the RGV/McAllen script, pair it with a real, currently-active Restoration GC job close enough to legitimately claim as "nearby." This feeds the `{{reference_street}}` variable. If no valid match exists, the lead must NOT be routed through this script.
 
+**Radius note (2026-08-03):** The initial production run against the 69-lead RGV batch used a 1-mile radius and matched only 4/69, all to one job. At MJ's direction the radius was widened to 6 miles for that run (max actual distance across the batch: 5.64 mi — all matches stayed inside the McAllen/Edinburg/Hidalgo metro footprint), which brought coverage to 69/69 across 7 distinct jobs. Flagging since the script's Phase 1 line ("not far from your property") is written for street/same-neighborhood proximity — at the top end of a 6-mile radius that phrasing is a stretch even though the underlying job/insurance/timing facts stay true. Worth revisiting radius vs. script wording together as more active-job coverage comes online.
+
 This slots into [[storm-lead-automation]] as a new enrichment step, immediately before the Retell push — after property enrichment, before the outbound call is queued.
 
 -----
