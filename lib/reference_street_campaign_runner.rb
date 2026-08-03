@@ -45,9 +45,10 @@ class ReferenceStreetCampaignRunner
     end
 
     dnc = fetch_do_not_call_set
+    @dialed_phones = fetch_already_dialed_phones
     puts "[campaign] DRY RUN — no writes to Supabase, no calls placed via Retell.\n\n" if @dry_run
 
-    total = { dialed: 0, standard_hail_hook: 0, do_not_call: 0, enrichment_incomplete: 0 }
+    total = { dialed: 0, standard_hail_hook: 0, do_not_call: 0, enrichment_incomplete: 0, duplicate_phone: 0 }
     loop do
       batch = fetch_batch
       break if batch.empty?
@@ -72,7 +73,7 @@ class ReferenceStreetCampaignRunner
   end
 
   # Returns a symbol describing the outcome: :dialed, :standard_hail_hook,
-  # :do_not_call, or :enrichment_incomplete.
+  # :do_not_call, :duplicate_phone, or :enrichment_incomplete.
   def process_lead(lead, dnc)
     unless enriched?(lead)
       log(lead, 'enrichment_incomplete — missing property/lat-lng/phone')
@@ -80,10 +81,21 @@ class ReferenceStreetCampaignRunner
       return :enrichment_incomplete
     end
 
-    if dnc.include?(normalize_phone(lead['contact_phone']))
+    phone = normalize_phone(lead['contact_phone'])
+
+    if dnc.include?(phone)
       log(lead, 'do_not_call — phone matches do_not_call table')
       patch_lead(lead['lead_id'], call_status: 'do_not_call')
       return :do_not_call
+    end
+
+    # Multiple lead rows can share one contact_phone (e.g. repeat hail-event entries
+    # for the same property) — only ever dial a given number once per campaign,
+    # regardless of how many lead rows it appears on or which batch they land in.
+    if @dialed_phones.include?(phone)
+      log(lead, 'duplicate_phone — already dialed this phone number')
+      patch_lead(lead['lead_id'], call_status: 'duplicate_phone')
+      return :duplicate_phone
     end
 
     job = @matcher.match(lat: lead['lat'], lng: lead['lng'], radius_miles: MATCH_RADIUS_MILES)
@@ -105,6 +117,7 @@ class ReferenceStreetCampaignRunner
     )
 
     call_id = place_call(lead, job)
+    @dialed_phones << phone # must happen before the next lead is processed, in case it shares this phone
 
     patch_lead(
       lead['lead_id'],
@@ -181,6 +194,14 @@ class ReferenceStreetCampaignRunner
     uri = URI("#{@supabase_url}/rest/v1/do_not_call")
     uri.query = URI.encode_www_form(select: 'phone_e164')
     JSON.parse(decoded_body(get(uri))).map { |row| normalize_phone(row['phone_e164']) }.to_set
+  end
+
+  # Every phone number that already has a retell_call_id, from this run or any past one —
+  # so re-running the campaign (or resuming after an interruption) never re-dials a number.
+  def fetch_already_dialed_phones
+    uri = URI("#{@supabase_url}/rest/v1/leads")
+    uri.query = URI.encode_www_form(select: 'contact_phone', retell_call_id: 'not.is.null')
+    JSON.parse(decoded_body(get(uri))).map { |row| normalize_phone(row['contact_phone']) }.to_set
   end
 
   def decoded_body(response)
