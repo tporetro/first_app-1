@@ -64,7 +64,11 @@ class ReferenceStreetCampaignRunner
   private
 
   def calling_hours?
-    CALLING_HOURS_LOCAL.cover?(Time.now.getlocal('-06:00').hour) # CST approx; DST not handled
+    original_tz = ENV['TZ']
+    ENV['TZ'] = 'America/Chicago' # DST-aware via system tzdata, unlike a fixed UTC offset
+    CALLING_HOURS_LOCAL.cover?(Time.now.hour)
+  ensure
+    ENV['TZ'] = original_tz
   end
 
   # Returns a symbol describing the outcome: :dialed, :standard_hail_hook,
