@@ -1,6 +1,9 @@
 require 'net/http'
 require 'json'
 require 'uri'
+require 'time'
+require 'zlib'
+require 'stringio'
 require_relative 'reference_job_matcher'
 
 # Repeating batch pipeline for the RGV/McAllen reference-street campaign:
@@ -23,31 +26,39 @@ class ReferenceStreetCampaignRunner
 
   def initialize(supabase_url: ENV.fetch('SUPABASE_URL'),
                   supabase_key: ENV.fetch('SUPABASE_KEY'),
-                  retell_api_key: ENV.fetch('RETELL_API_KEY'),
-                  matcher: ReferenceJobMatcher.new)
+                  retell_api_key: ENV.fetch('RETELL_API_KEY', nil),
+                  matcher: ReferenceJobMatcher.new,
+                  dry_run: false)
     @supabase_url = supabase_url.chomp('/')
     @supabase_key = supabase_key
     @retell_api_key = retell_api_key
     @matcher = matcher
+    @dry_run = dry_run
   end
 
   # Runs batches of up to BATCH_SIZE until no eligible leads remain.
   # allow_outside_hours: true bypasses the calling-hours gate (for dry runs/tests only).
   def run_batches!(allow_outside_hours: false)
-    unless allow_outside_hours || calling_hours?
+    unless allow_outside_hours || @dry_run || calling_hours?
       puts '[campaign] Outside calling hours window, not dialing this run.'
       return
     end
 
     dnc = fetch_do_not_call_set
+    puts "[campaign] DRY RUN — no writes to Supabase, no calls placed via Retell.\n\n" if @dry_run
+
+    total = { dialed: 0, standard_hail_hook: 0, do_not_call: 0, enrichment_incomplete: 0 }
     loop do
       batch = fetch_batch
       break if batch.empty?
 
-      batch.each { |lead| process_lead(lead, dnc) }
+      batch.each { |lead| total[process_lead(lead, dnc)] += 1 }
       puts "[campaign] Processed batch of #{batch.size}."
+      break if @dry_run # fetch_batch filters on call_status/retell_call_id, which dry runs never mutate
     end
     puts '[campaign] No more eligible leads. Done.'
+    puts "[campaign] Summary: #{total}"
+    total
   end
 
   private
@@ -56,24 +67,30 @@ class ReferenceStreetCampaignRunner
     CALLING_HOURS_LOCAL.cover?(Time.now.getlocal('-06:00').hour) # CST approx; DST not handled
   end
 
+  # Returns a symbol describing the outcome: :dialed, :standard_hail_hook,
+  # :do_not_call, or :enrichment_incomplete.
   def process_lead(lead, dnc)
     unless enriched?(lead)
+      log(lead, 'enrichment_incomplete — missing property/lat-lng/phone')
       patch_lead(lead['lead_id'], call_status: 'enrichment_incomplete')
-      return
+      return :enrichment_incomplete
     end
 
     if dnc.include?(normalize_phone(lead['contact_phone']))
+      log(lead, 'do_not_call — phone matches do_not_call table')
       patch_lead(lead['lead_id'], call_status: 'do_not_call')
-      return
+      return :do_not_call
     end
 
     job = @matcher.match(lat: lead['lat'], lng: lead['lng'], radius_miles: MATCH_RADIUS_MILES)
 
     if job.nil?
+      log(lead, 'standard_hail_hook — no active job within radius')
       patch_lead(lead['lead_id'], hook_path_used: 'standard_hail_hook')
-      return
+      return :standard_hail_hook
     end
 
+    log(lead, "dialed — matched job #{job.job_id} (#{job.reference_street}), would call #{lead['contact_phone']}")
     patch_lead(
       lead['lead_id'],
       reference_job_location: job.reference_street,
@@ -90,7 +107,13 @@ class ReferenceStreetCampaignRunner
       called_at: Time.now.utc.iso8601
     )
 
-    sleep CALL_THROTTLE_SECONDS
+    sleep CALL_THROTTLE_SECONDS unless @dry_run
+    :dialed
+  end
+
+  def log(lead, message)
+    prefix = @dry_run ? '[dry-run]' : '[campaign]'
+    puts "#{prefix} lead #{lead['lead_id']} (#{lead['address']}): #{message}"
   end
 
   def enriched?(lead)
@@ -101,9 +124,16 @@ class ReferenceStreetCampaignRunner
     phone.to_s.gsub(/\D/, '').sub(/\A1(\d{10})\z/, '\1')
   end
 
-  def city_from_address(address)
+  STATE_ABBREVIATIONS = %w[TX MN].to_set
+
+  # Addresses are "street, city, state" when city was captured, but some rows are
+  # only "street, state" — falls back to county so {{city}} never renders as "TX".
+  def city_from_address(address, county_fallback)
     parts = address.to_s.split(',').map(&:strip)
-    parts[1]
+    candidate = parts[1]
+    return candidate if candidate && !STATE_ABBREVIATIONS.include?(candidate.upcase)
+
+    county_fallback
   end
 
   def first_name_from(contact_name)
@@ -111,6 +141,8 @@ class ReferenceStreetCampaignRunner
   end
 
   def place_call(lead, job)
+    return 'dry_run_no_call' if @dry_run
+
     uri = URI('https://api.retellai.com/v2/create-phone-call')
     body = {
       from_number: FROM_NUMBER,
@@ -118,7 +150,7 @@ class ReferenceStreetCampaignRunner
       retell_llm_dynamic_variables: {
         first_name: first_name_from(lead['contact_name']),
         address_raw_best: lead['address'],
-        city: city_from_address(lead['address']),
+        city: city_from_address(lead['address'], lead['county']),
         state: lead['state'],
         call_attempt: '1',
         reference_street: job.reference_street
@@ -136,16 +168,25 @@ class ReferenceStreetCampaignRunner
       retell_call_id: 'is.null',
       limit: BATCH_SIZE
     )
-    JSON.parse(get(uri).body)
+    JSON.parse(decoded_body(get(uri)))
   end
 
   def fetch_do_not_call_set
     uri = URI("#{@supabase_url}/rest/v1/do_not_call")
     uri.query = URI.encode_www_form(select: 'phone_e164')
-    JSON.parse(get(uri).body).map { |row| normalize_phone(row['phone_e164']) }.to_set
+    JSON.parse(decoded_body(get(uri))).map { |row| normalize_phone(row['phone_e164']) }.to_set
+  end
+
+  def decoded_body(response)
+    body = response.body
+    return body unless response['content-encoding'] == 'gzip'
+
+    Zlib::GzipReader.new(StringIO.new(body)).read
   end
 
   def patch_lead(lead_id, attrs)
+    return if @dry_run
+
     uri = URI("#{@supabase_url}/rest/v1/leads")
     uri.query = URI.encode_www_form(id: "eq.#{lead_id}")
     patch_json(uri, attrs, @supabase_key)
