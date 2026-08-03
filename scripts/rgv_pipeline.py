@@ -247,70 +247,73 @@ def run_apify_actor(actor_id, actor_input):
 
 
 # -- Stage 2a: SOS entity resolution (LLC/corp -> person) --------------
+#
+# VERIFIED against the real clawdeus/tx-biz-lookup actor (2026-08-03, via
+# live test calls -- see docs/campaigns/rgv-mcallen/n8n-pipeline.md history).
+# This actor takes ONE searchQuery per run (no batch/array input despite the
+# original script's assumption) and does not echo back a caller-supplied
+# correlation ID, so Stage 2a calls it once per entity-owned lead.
+#
+# Titles that plausibly indicate "the actual person who'd answer about this
+# property," ranked by preference. Falls back to the first listed officer
+# if none of these titles are present (e.g. a flat officer list with no
+# clear hierarchy) -- better than no name, but tag it as such downstream.
+SOS_PREFERRED_TITLES = ("PRESIDENT", "OWNER", "MEMBER", "MANAGER", "MANAGING")
 
-def build_sos_input(entity_leads):
-    """
-    ADJUST TO YOUR ACTOR'S SCHEMA.
 
-    Packages leads with an entity Owner Name for the opensosdata actor.
-    Only leads where is_entity_owned() is True should reach this function.
-    """
-    return {
-        "lookups": [
-            {
-                "account_id": row.get("Account ID", ""),
-                "entity_name": row.get("Owner Name", ""),
-                "state": "TX",
-            }
-            for row in entity_leads
-        ]
-    }
+def build_sos_input(owner_name):
+    """ADJUST TO YOUR ACTOR'S SCHEMA. Verified: single searchQuery per run."""
+    return {"searchQuery": owner_name}
 
 
 def parse_sos_output(dataset_items):
     """
     ADJUST TO YOUR ACTOR'S SCHEMA.
 
-    Expected fields per item: account_id, resolved_person_first_name,
-    resolved_person_last_name. Returns dict keyed by account_id.
-    Adjust field names to match what the actor actually returns
-    (e.g. it may return "registered_agent_name" as a single string
-    rather than split first/last -- split it here if so).
+    Verified real shape: dataset_items is a list of entity records, each with
+    an "officers" list of {"AGNT_NM": "FULL NAME", "AGNT_TITL_TX": "TITLE", ...}.
+    AGNT_NM is one string, not split first/last -- split it here.
+    "registeredAgentName" is often a corporate registered-agent SERVICE
+    (e.g. "CT CORPORATION SYSTEM"), not a person -- do not use it as a name.
+
+    Returns (first_name, last_name, title) for the best-guess officer, or
+    (None, None, None) if no entity/no officers found.
     """
-    resolved = {}
-    for item in dataset_items:
-        acct_id = str(item.get("account_id", ""))
-        if acct_id:
-            resolved[acct_id] = {
-                "resolved_first_name": item.get("resolved_person_first_name", ""),
-                "resolved_last_name": item.get("resolved_person_last_name", ""),
-            }
-    return resolved
+    if not dataset_items:
+        return None, None, None
+    officers = dataset_items[0].get("officers") or []
+    if not officers:
+        return None, None, None
+
+    chosen = next(
+        (o for o in officers if any(t in (o.get("AGNT_TITL_TX") or "").upper() for t in SOS_PREFERRED_TITLES)),
+        officers[0],
+    )
+    full_name = (chosen.get("AGNT_NM") or "").strip()
+    if not full_name:
+        return None, None, None
+    parts = full_name.split()
+    first = parts[0] if parts else None
+    last = parts[-1] if len(parts) > 1 else None
+    return first, last, chosen.get("AGNT_TITL_TX")
 
 
 # -- Stage 2b: skip-trace (person name -> phone) ------------------------
+#
+# VERIFIED against the real one-api/skip-trace actor (2026-08-03). "name"
+# must be a single-element array containing the FULL name as one string --
+# passing ["First", "Last"] as two elements runs two independent (and here,
+# failed) single-token person searches instead of one combined search.
+# Like the SOS actor, this is one call per lead, not a batch array.
 
-def build_skiptrace_input(leads_with_names):
-    """
-    ADJUST TO YOUR ACTOR'S SCHEMA.
-
-    leads_with_names: rows that already have a person name to search on,
-    either the original Owner Name (individual owner) or a name resolved
-    in Stage 2a (entity owner). Property address included to help the
-    skip-trace actor disambiguate common names.
-    """
+def build_skiptrace_input(first_name, last_name, address, city, state):
+    """ADJUST TO YOUR ACTOR'S SCHEMA. Verified: name is [full_name_string]."""
+    full_name = f"{first_name} {last_name}".strip()
     return {
-        "searches": [
-            {
-                "account_id": row.get("Account ID", ""),
-                "first_name": row.get("_search_first_name", ""),
-                "last_name": row.get("_search_last_name", ""),
-                "property_address": row.get("Property Address", ""),
-                "city": row.get("City", ""),
-                "state": "TX",
-            }
-            for row in leads_with_names
-        ]
+        "name": [full_name],
+        "address": address or "",
+        "city": city or "",
+        "state": state or "TX",
     }
 
 
@@ -318,31 +321,52 @@ def parse_skiptrace_output(dataset_items):
     """
     ADJUST TO YOUR ACTOR'S SCHEMA.
 
-    Expected fields per item: account_id, phone, email (optional).
-    Returns dict keyed by account_id.
+    Verified real shape: dataset_items[0]["First Name"] == "Person Not Found"
+    on a miss. On a hit, phones are "Phone-1".."Phone-5" (may be sparse) and
+    emails "Email-1".."Email-5". Takes the first non-empty phone/email.
+
+    IMPORTANT (found via live testing 2026-08-03): the actor does NOT hard-filter
+    by the state passed in the request -- it can return its best-guess match
+    for a common name in a completely different state (a McAllen, TX search
+    returned a person living in Florida). Returns the matched "Address Region"
+    too, so the caller can sanity-check it against the property's state before
+    treating this as a real match -- see GEOGRAPHIC_MATCH_REQUIRED below.
+    Returns (phone, email, matched_state) or (None, None, None) if not found.
     """
-    results = {}
-    for item in dataset_items:
-        acct_id = str(item.get("account_id", ""))
-        if acct_id:
-            results[acct_id] = {
-                "contact_phone": item.get("phone", ""),
-                "contact_email": item.get("email", ""),
-            }
-    return results
+    if not dataset_items:
+        return None, None, None
+    item = dataset_items[0]
+    if not item or item.get("First Name") == "Person Not Found":
+        return None, None, None
+    phone = next((item.get(f"Phone-{i}") for i in range(1, 6) if item.get(f"Phone-{i}")), None)
+    email = next((item.get(f"Email-{i}") for i in range(1, 6) if item.get(f"Email-{i}")), None)
+    matched_state = item.get("Address Region")
+    return phone, email, matched_state
+
+
+# Skip-trace matches whose "Address Region" doesn't match the property's own
+# state are rejected rather than dialed -- a McAllen, TX property owner whose
+# best-guess skip-trace hit lives in Florida is very likely the wrong person
+# entirely (a same-name stranger), not someone who relocated. Found via live
+# testing: "Alan Miller" (Trenton Street Corp's resolved officer) matched to
+# an unrelated "Allan Miller" in Lithia, FL. Set to False to disable (not
+# recommended -- this is a real wrong-person-call risk, not a false positive
+# guard being overly cautious).
+GEOGRAPHIC_MATCH_REQUIRED = True
 
 
 def run_two_stage_enrichment(batch_rows, dry_run):
     """
     Runs Stage 2a (SOS resolution, entity-owned leads only) then Stage 2b
-    (skip-trace, all leads) and merges results back onto batch_rows.
+    (skip-trace, all non-institutional leads) and merges results back onto
+    batch_rows. One Apify call per lead per stage -- see the "VERIFIED"
+    notes above on build_sos_input/build_skiptrace_input for why this
+    isn't batched into a single actor run.
     """
     if dry_run:
         merged = []
         for row in batch_rows:
             r = dict(row)
-            r["_search_first_name"] = ""
-            r["_search_last_name"] = ""
             r["contact_first_name"] = ""
             r["contact_last_name"] = ""
             r["contact_phone"] = ""
@@ -357,100 +381,79 @@ def run_two_stage_enrichment(batch_rows, dry_run):
             "be set for a live run. Use --dry-run to test pipeline logic without credentials."
         )
 
-    # Three-way split: institutional owners are excluded outright (see
-    # INSTITUTIONAL_MARKERS docstring above -- SOS resolution and name-based
-    # skip-trace both produce garbage for a school district or county).
-    # Check institutional FIRST, since some institutional names also contain
-    # entity-like words (e.g. "Trust" appearing in a church name).
-    institutional_leads = []
-    entity_leads = []
-    individual_leads = []
-    for row in batch_rows:
-        owner = row.get("Owner Name", "")
-        if is_institutional_owner(owner):
-            institutional_leads.append(row)
-        elif is_entity_owned(owner):
-            entity_leads.append(row)
-        else:
-            individual_leads.append(row)
-
-    entity_account_ids = {r.get("Account ID") for r in entity_leads}
-
-    # Stage 2a: resolve entities to people
-    sos_resolved = {}
-    if entity_leads:
-        sos_input = build_sos_input(entity_leads)
-        sos_items = run_apify_actor(APIFY_SOS_ACTOR_ID, sos_input)
-        sos_resolved = parse_sos_output(sos_items)
-
-    # Attach the name to search on for every non-institutional lead
-    prepped = []
+    merged = []
     for row in batch_rows:
         r = dict(row)
-        acct_id = str(row.get("Account ID", ""))
+        owner = row.get("Owner Name", "")
 
-        if row in institutional_leads:
-            r["_search_first_name"] = ""
-            r["_search_last_name"] = ""
-            r["_sos_resolved"] = "not_applicable_institutional_owner"
-            prepped.append(r)
-            continue
-
-        if row.get("Account ID") in entity_account_ids:
-            resolution = sos_resolved.get(acct_id)
-            if resolution:
-                r["_search_first_name"] = resolution["resolved_first_name"]
-                r["_search_last_name"] = resolution["resolved_last_name"]
-                r["_sos_resolved"] = "yes"
-            else:
-                r["_search_first_name"] = ""
-                r["_search_last_name"] = ""
-                r["_sos_resolved"] = "no_match"
-        elif is_joint_owner(row.get("Owner Name", "")):
-            # Two+ people listed together -- take only the first-listed
-            # person for the search rather than mangling both names
-            # together. Flagged so downstream knows a co-owner exists
-            # and wasn't searched.
-            owner_raw = row.get("Owner Name", "") or ""
-            first_person = owner_raw.split("&")[0].split(" AND ")[0].strip()
-            parts = first_person.split()
-            r["_search_first_name"] = parts[0] if parts else ""
-            r["_search_last_name"] = parts[-1] if len(parts) > 1 else ""
-            r["_sos_resolved"] = "not_applicable_joint_owner_first_listed_only"
-        else:
-            # individual owner -- split Owner Name as a naive first/last guess
-            parts = (row.get("Owner Name", "") or "").split()
-            r["_search_first_name"] = parts[0] if parts else ""
-            r["_search_last_name"] = parts[-1] if len(parts) > 1 else ""
-            r["_sos_resolved"] = "not_applicable_individual_owner"
-        prepped.append(r)
-
-    # Stage 2b: skip-trace everyone who has a name to search on
-    skiptrace_candidates = [r for r in prepped if r.get("_search_first_name") or r.get("_search_last_name")]
-    skiptrace_results = {}
-    if skiptrace_candidates:
-        skiptrace_input = build_skiptrace_input(skiptrace_candidates)
-        skiptrace_items = run_apify_actor(APIFY_SKIPTRACE_ACTOR_ID, skiptrace_input)
-        skiptrace_results = parse_skiptrace_output(skiptrace_items)
-
-    merged = []
-    for r in prepped:
-        acct_id = str(r.get("Account ID", ""))
-        contact = skiptrace_results.get(acct_id)
-        r["contact_first_name"] = r.get("_search_first_name", "")
-        r["contact_last_name"] = r.get("_search_last_name", "")
-        if r.get("_sos_resolved") == "not_applicable_institutional_owner":
+        # Three-way split: institutional owners are excluded outright (see
+        # INSTITUTIONAL_MARKERS docstring above -- SOS resolution and
+        # name-based skip-trace both produce garbage for a school district
+        # or county). Checked first since institutional names can also
+        # contain entity-like words (e.g. "Trust" in a church name).
+        if is_institutional_owner(owner):
+            r["contact_first_name"] = ""
+            r["contact_last_name"] = ""
             r["contact_phone"] = ""
             r["contact_email"] = ""
             r["enrichment_status"] = "excluded_institutional_owner"
-        elif contact and contact.get("contact_phone"):
-            r["contact_phone"] = contact["contact_phone"]
-            r["contact_email"] = contact.get("contact_email", "")
-            r["enrichment_status"] = "matched"
-        elif r.get("_sos_resolved") == "no_match":
+            merged.append(r)
+            continue
+
+        if is_entity_owned(owner):
+            sos_items = run_apify_actor(APIFY_SOS_ACTOR_ID, build_sos_input(owner))
+            first, last, title = parse_sos_output(sos_items)
+            if first is None:
+                r["contact_first_name"] = ""
+                r["contact_last_name"] = ""
+                r["contact_phone"] = ""
+                r["contact_email"] = ""
+                r["enrichment_status"] = "sos_resolution_failed"
+                merged.append(r)
+                continue
+            search_first, search_last = first, last
+        elif is_joint_owner(owner):
+            # Two+ people listed together -- take only the first-listed
+            # person rather than mangling both names together.
+            first_person = (owner or "").split("&")[0].split(" AND ")[0].strip()
+            parts = first_person.split()
+            search_first = parts[0] if parts else ""
+            search_last = parts[-1] if len(parts) > 1 else ""
+        else:
+            # individual owner -- naive first/last split of Owner Name.
+            # Note: real gaps found in testing -- some unsuffixed business
+            # names (e.g. "Day Surgery At Renaissance") land here too. See
+            # commit history / n8n-pipeline.md for details.
+            parts = (owner or "").split()
+            search_first = parts[0] if parts else ""
+            search_last = parts[-1] if len(parts) > 1 else ""
+
+        r["contact_first_name"] = search_first
+        r["contact_last_name"] = search_last
+
+        if not search_first and not search_last:
             r["contact_phone"] = ""
             r["contact_email"] = ""
-            r["enrichment_status"] = "sos_resolution_failed"
+            r["enrichment_status"] = "no_name_to_search"
+            merged.append(r)
+            continue
+
+        skiptrace_items = run_apify_actor(
+            APIFY_SKIPTRACE_ACTOR_ID,
+            build_skiptrace_input(search_first, search_last, row.get("Property Address", ""),
+                                   row.get("City", ""), "TX"),
+        )
+        phone, email, matched_state = parse_skiptrace_output(skiptrace_items)
+        if phone and GEOGRAPHIC_MATCH_REQUIRED and matched_state and matched_state.strip().upper() != "TX":
+            # Very likely a same-name stranger, not the actual owner -- see
+            # GEOGRAPHIC_MATCH_REQUIRED docstring above.
+            r["contact_phone"] = ""
+            r["contact_email"] = ""
+            r["enrichment_status"] = f"skiptrace_rejected_geo_mismatch_{matched_state}"
+        elif phone:
+            r["contact_phone"] = phone
+            r["contact_email"] = email or ""
+            r["enrichment_status"] = "matched"
         else:
             r["contact_phone"] = ""
             r["contact_email"] = ""
