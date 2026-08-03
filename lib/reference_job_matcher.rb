@@ -25,7 +25,7 @@ class ReferenceJobMatcher
   private
 
   def load_jobs(path)
-    CSV.read(path, headers: true).filter_map do |row|
+    CSV.read(path, headers: true, encoding: 'UTF-8').filter_map do |row|
       next unless row['pipeline_ready'].to_s.strip.casecmp('true').zero?
       next unless %w[active scheduled].include?(row['job_status'].to_s.strip)
       next unless row['insurance_funded'].to_s.strip.casecmp('yes').zero?
