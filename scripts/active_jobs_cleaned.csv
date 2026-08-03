@@ -1,0 +1,34 @@
+Job ID,job_id,original_address,reference_street,city,latitude,longitude,geocode_precision,job_status,insurance_funded,client_consented,pipeline_ready,notes
+267283,267283,"2003 E Main St, Mission, TX nan",E Main St,Mission,26.2847,-98.2941,original,active,yes,yes,True,
+562602,562602,"5132 Mile 12 N, nan, TX nan",Mile 12 North Road,Acre Tract Colonia,26.23072,-97.93058,original,active,yes,yes,True,city filled via reverse geocode
+518601,518601,"Eldora Rd, Alamo, TX nan",Eldora Rd,Alamo,26.21221,-98.09212,original,active,yes,yes,True,
+112718,112718,"1443 N Tower Rd, Pharr, TX nan",N Tower Rd,Pharr,26.21914,-98.10706,original,active,yes,yes,True,
+633646,633646,"3006 Raul Longoria Rd, McAllen, TX nan",Raul Longoria Rd,McAllen,26.22453,-98.15003,original,scheduled,yes,yes,True,
+79728,79728,"121 E Austin Ave, Harlingen, TX 78550",E Austin Ave,Harlingen,26.20226,-97.695058,forward_geocoded_per_property,active,yes,yes,True,
+137958,137958,"32120 Fm 1847, Los Fresnos, TX 78566",Fm 1847,Los Fresnos,26.07409,-97.476051,forward_geocoded_per_property,active,yes,yes,True,
+845827,845827,"701 E Nolana Loop, McAllen, TX nan",E Nolana Loop,McAllen,26.23272,-98.17,original,active,yes,yes,True,
+176729,176729,"9501 W Expressway 83, La Feria, TX 78559",W Expressway 83,La Feria,26.165671,-97.842848,forward_geocoded_per_property,scheduled,yes,yes,True,
+246266,246266,"2402 W Highway 77, San Benito, TX 78586",W Highway 77,San Benito,26.107913,-97.602209,forward_geocoded_highway_approx,active,yes,yes,True,"shares approx. coordinate w/ other Hwy 77 San Benito jobs — highway frontage, precise unit-level geocode unavailable; verify manually if fine-grained radius ranking needed"
+547397,547397,"100 W Nolana Loop, McAllen, TX nan",W Nolana Loop,McAllen,26.23387,-98.17876,original,active,yes,yes,True,
+85491,85491,"118 E Central, La Feria, TX 78559",E Central,La Feria,26.154757,-97.823779,forward_geocoded_per_property,active,yes,yes,True,
+129738,129738,"13729 Mi 1/2 W, nan, TX nan",Mile 1½ West Road,La Mesa Colonia,26.22491,-97.93759,original,active,yes,yes,True,city filled via reverse geocode
+103022,103022,"1615 W Highway 77, San Benito, TX 78586",W Highway 77,San Benito,26.107913,-97.602209,forward_geocoded_highway_approx,active,yes,yes,True,"shares approx. coordinate w/ other Hwy 77 San Benito jobs — highway frontage, precise unit-level geocode unavailable; verify manually if fine-grained radius ranking needed"
+85603,85603,"210 Bearfield Ln, La Feria, TX 78559",Bearfield Ln,La Feria,26.148685,-97.824445,forward_geocoded_per_property,active,yes,yes,True,
+270547,270547,"N Ware Rd, nan, TX nan",North Ware Road,Simpatico Acres Colonia,26.3811,-98.24198,original,active,yes,yes,True,city filled via reverse geocode
+189055,189055,"1120 Expressway 77/83, San Benito, TX 78586",Expressway 77/83,San Benito,26.153067,-97.671189,forward_geocoded_highway_approx,active,yes,yes,True,
+451570,451570,"11833 Olive Grove, nan, TX nan",Garcia Street,Heidelberg,26.19823,-97.87989,original,active,yes,yes,True,city filled via reverse geocode
+678206,678206,"5721 Fm 1015, Weslaco, TX nan",Fm 1015,Weslaco,26.21485,-97.96011,original,scheduled,yes,yes,True,
+105051,105051,"2280 W Highway 77, San Benito, TX 78586",W Highway 77,San Benito,26.107913,-97.602209,forward_geocoded_highway_approx,active,yes,yes,True,"shares approx. coordinate w/ other Hwy 77 San Benito jobs — highway frontage, precise unit-level geocode unavailable; verify manually if fine-grained radius ranking needed"
+325185,325185,"949 W Mile 12 1/2 N, nan, TX nan",Mile 12½ North Road,Weslaco,26.2348,-98.001,original,active,yes,yes,True,city filled via reverse geocode
+131493,131493,"9 1/2 N & Fm 491, nan, TX nan",Mile 10 North Road,Mercedes,26.19421,-97.90863,original,active,yes,yes,True,city filled via reverse geocode
+71327,71327,"2202 Hwy 77 South, Harlingen, TX 78550",Hwy 77 South,Harlingen,26.224207,-97.721192,forward_geocoded_highway_approx,active,yes,yes,True,
+702285,702285,"22310 N Moorefield Rd, nan, TX nan",N Moorefield Rd,Monte Christo,26.39576,-98.32481,original,active,yes,yes,True,city filled via reverse geocode
+324909,324909,"7212 N Milano Rd, nan, TX nan",Mile 12 North Road,Weslaco,26.22719,-98.01403,original,active,yes,yes,True,city filled via reverse geocode
+204715,204715,"3502 Spur 54, Harlingen, TX 78550",Spur 54,Harlingen,26.189117,-97.727597,forward_geocoded_per_property,active,yes,yes,True,
+715294,715294,"3005 Diamondhead Ave, Mission, TX nan",Diamondhead Ave,Mission,26.28904,-98.28445,original,active,yes,yes,True,
+509656,509656,"Mi 1 1/2 W, nan, TX nan",Mile 1½ West Road,La Mesa Colonia,26.21959,-97.93438,original,active,yes,yes,True,city filled via reverse geocode
+641219,641219,"5753 N Fm 493, Donna, TX nan",N Fm 493,Donna,26.21405,-98.03737,original,active,yes,yes,True,
+193026,193026,"522 El Dora Rd, Donna, TX nan",El Dora Rd,Donna,26.21464,-98.06676,original,active,yes,yes,True,
+263770,263770,"2111 Mile 12 N, nan, TX nan",Sylvia Handy Street,Puesta del Sol Colonia,26.22806,-97.97119,original,completed,yes,yes,False,"city filled via reverse geocode; EXCLUDED — job status is 'completed', not present-tense active/scheduled work"
+270521,270521,"18100 N Rooth Rd, nan, TX nan",North Rooth Road,,26.38026,-98.22072,original,active,yes,yes,False,NEEDS MANUAL CITY LOOKUP — no OSM coverage at this location
+80151,80151,"702 S Ed Carey Dr, Harlingen, TX 78550",S Ed Carey Dr,Harlingen,26.150631,-97.688282,forward_geocoded_per_property,completed,yes,yes,False,"EXCLUDED — job status is 'completed', not present-tense active/scheduled work"

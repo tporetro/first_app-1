@@ -14,3 +14,5 @@
 # Ignore all logfiles and tempfiles.
 /log/*.log
 /tmp
+scripts/pipeline_audit_log.csv
+scripts/__pycache__/
