@@ -260,34 +260,138 @@ def run_apify_actor(actor_id, actor_input):
 # clear hierarchy) -- better than no name, but tag it as such downstream.
 SOS_PREFERRED_TITLES = ("PRESIDENT", "OWNER", "MEMBER", "MANAGER", "MANAGING")
 
+# Found via live testing (2026-08-03): the actor does near-exact matching on
+# searchQuery, and county tax-roll "Owner Name" strings rarely match the exact
+# SOS-registered legal name -- e.g. "STORE MASTER FUNDING III LLC" -> 0
+# results, but "STORE MASTER FUNDING" -> 10. Stripping the corporate suffix
+# surfaces candidates, but a bare prefix like "SECURCARE" can return many
+# unrelated entities (and the actor caps results at 10, so the real one isn't
+# guaranteed to be among them) -- so candidates must pass _is_confident_match
+# against the original full name, rather than blindly taking the first result.
+CORPORATE_SUFFIX_WORDS = {
+    "LLC", "LLP", "LP", "LTD", "LIMITED", "INC", "INCORPORATED", "CORP",
+    "CORPORATION", "CO", "COMPANY", "TRUST", "TR", "PARTNERSHIP",
+}
 
-def build_sos_input(owner_name):
+
+def _strip_corporate_suffix(name):
+    """Drops trailing corporate-suffix tokens (LLC, LP, INC, ...) one at a
+    time from the end, e.g. "STORE MASTER FUNDING III LLC" -> "STORE MASTER
+    FUNDING III" -> ... Returns the shortest meaningful prefix, or the
+    original name if it has no recognized suffix to strip."""
+    tokens = (name or "").upper().replace(",", "").replace(".", "").split()
+    while tokens and tokens[-1] in CORPORATE_SUFFIX_WORDS:
+        tokens.pop()
+    stripped = " ".join(tokens)
+    return stripped or name
+
+
+def _name_tokens(name):
+    return set((name or "").upper().replace(",", "").replace(".", "").split()) - CORPORATE_SUFFIX_WORDS
+
+
+def _is_confident_match(original_name, candidate_business_name):
+    """
+    Every meaningful word from the original (CAD) name must appear in the
+    candidate's business name -- strict containment, not a similarity score.
+
+    Two approaches were tried and rejected before this one:
+    - difflib.SequenceMatcher (character-level): scored "SECURCARE MOVEIT
+      MCALLEN LLC" vs "SECURCARE PROPERTIES I, LLC" at 0.66 purely from the
+      shared "SECURCARE...LLC" prefix/suffix, letting a wrong entity through
+      even though the distinguishing words (MOVEIT MCALLEN vs PROPERTIES I)
+      share nothing.
+    - Jaccard word overlap with a threshold: still fooled by near-miss series
+      names, e.g. "...FUNDING III LLC" vs "...FUNDING IV LLC" share 3 of 4
+      tokens (0.6 Jaccard) despite being different entities in a numbered
+      series -- a plausible real pattern in this dataset (SecurCare itself
+      has "PROPERTIES I/II/III/X" as distinct filings).
+
+    Containment fixes both: MOVEIT/MCALLEN are absent from every SecurCare
+    candidate -> correctly rejected. "III" is a real, required token that a
+    "IV" candidate doesn't contain -> correctly rejected. Costs recall (a
+    candidate with genuinely extra/reordered words that still IS the right
+    entity could be missed) in exchange for not calling the wrong person.
+    """
+    orig_tokens = _name_tokens(original_name)
+    cand_tokens = _name_tokens(candidate_business_name)
+    if not orig_tokens or not cand_tokens:
+        return False
+    return orig_tokens.issubset(cand_tokens)
+
+
+def build_sos_input(search_query):
     """ADJUST TO YOUR ACTOR'S SCHEMA. Verified: single searchQuery per run."""
-    return {"searchQuery": owner_name}
+    return {"searchQuery": search_query}
 
 
-def parse_sos_output(dataset_items):
+def sos_search_entity(owner_name, run_actor_fn):
+    """
+    Two-pass SOS search: try the full Owner Name first (works for entities
+    whose CAD name matches their SOS filing exactly), then fall back to a
+    corporate-suffix-stripped search if that returns nothing. Every
+    candidate returned by either pass must pass _is_confident_match against
+    the ORIGINAL owner name (not the stripped query) so a loose fallback
+    search doesn't let a wrong entity through.
+
+    run_actor_fn: callable(search_query) -> dataset_items, so this stays
+    testable without hitting the network (see run_apify_actor call site).
+
+    Returns the shortest confidently-matching entity dict (least likely to
+    be padded with unrelated extra words), or None if nothing qualifies.
+    """
+    items = run_actor_fn(owner_name)
+    stripped = _strip_corporate_suffix(owner_name)
+    if not items and stripped != owner_name.upper().strip():
+        items = run_actor_fn(stripped)
+    if not items:
+        return None
+
+    confident = [i for i in items if _is_confident_match(owner_name, i.get("businessName"))]
+    if not confident:
+        return None
+    return min(confident, key=lambda i: len(_name_tokens(i.get("businessName"))))
+
+
+def parse_sos_output(entity):
     """
     ADJUST TO YOUR ACTOR'S SCHEMA.
 
-    Verified real shape: dataset_items is a list of entity records, each with
-    an "officers" list of {"AGNT_NM": "FULL NAME", "AGNT_TITL_TX": "TITLE", ...}.
-    AGNT_NM is one string, not split first/last -- split it here.
-    "registeredAgentName" is often a corporate registered-agent SERVICE
-    (e.g. "CT CORPORATION SYSTEM"), not a person -- do not use it as a name.
+    Verified real shape: an entity record has an "officers" list of
+    {"AGNT_NM": "FULL NAME", "AGNT_TITL_TX": "TITLE", ...}. AGNT_NM is one
+    string, not split first/last -- split it here. "registeredAgentName" is
+    often a corporate registered-agent SERVICE (e.g. "CT CORPORATION
+    SYSTEM"), not a person -- do not use it as a name.
 
+    Found via live testing: some "officers" are themselves corporate/LP
+    entities acting as general partner or governing member (e.g. "16031
+    PARTNERS LTD"'s officer is "ASG CORP.", title "GENERAL PA[RTNER]") --
+    common in layered commercial real estate ownership. Skip-tracing a
+    corporate name as if it were a person is wrong, so those are filtered
+    out via is_entity_owned/is_institutional_owner before picking a "best"
+    officer -- if EVERY officer on file is itself a corporate entity, this
+    correctly returns no match rather than a nonsense person search.
+
+    Takes a single already-selected entity dict (see sos_search_entity
+    above, which handles picking the right one out of a search's results).
     Returns (first_name, last_name, title) for the best-guess officer, or
-    (None, None, None) if no entity/no officers found.
+    (None, None, None) if no entity/no individual officers found.
     """
-    if not dataset_items:
+    if not entity:
         return None, None, None
-    officers = dataset_items[0].get("officers") or []
-    if not officers:
+    officers = entity.get("officers") or []
+    individual_officers = [
+        o for o in officers
+        if (o.get("AGNT_NM") or "").strip()
+        and not is_entity_owned(o.get("AGNT_NM"))
+        and not is_institutional_owner(o.get("AGNT_NM"))
+    ]
+    if not individual_officers:
         return None, None, None
 
     chosen = next(
-        (o for o in officers if any(t in (o.get("AGNT_TITL_TX") or "").upper() for t in SOS_PREFERRED_TITLES)),
-        officers[0],
+        (o for o in individual_officers if any(t in (o.get("AGNT_TITL_TX") or "").upper() for t in SOS_PREFERRED_TITLES)),
+        individual_officers[0],
     )
     full_name = (chosen.get("AGNT_NM") or "").strip()
     if not full_name:
@@ -401,8 +505,10 @@ def run_two_stage_enrichment(batch_rows, dry_run):
             continue
 
         if is_entity_owned(owner):
-            sos_items = run_apify_actor(APIFY_SOS_ACTOR_ID, build_sos_input(owner))
-            first, last, title = parse_sos_output(sos_items)
+            entity = sos_search_entity(
+                owner, lambda q: run_apify_actor(APIFY_SOS_ACTOR_ID, build_sos_input(q))
+            )
+            first, last, title = parse_sos_output(entity)
             if first is None:
                 r["contact_first_name"] = ""
                 r["contact_last_name"] = ""
