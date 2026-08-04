@@ -179,7 +179,13 @@ def http_request(url, method="GET", headers=None, body=None, timeout=310, retry_
             except json.JSONDecodeError:
                 parsed = {"raw_error": raw}
             return e.code, parsed
-        except urllib.error.URLError:
+        except (urllib.error.URLError, ConnectionError, TimeoutError) as e:
+            # ConnectionError covers http.client.RemoteDisconnected (a
+            # ConnectionResetError subclass) which is NOT a URLError --
+            # a real production crash (batch_017) hit exactly this: a GET
+            # status-poll got "Remote end closed connection without
+            # response" and it propagated straight past the URLError catch,
+            # killing the whole batch with zero leads processed.
             if attempt == attempts:
                 raise
             time.sleep(2 ** attempt)  # 2s, 4s
