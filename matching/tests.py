@@ -325,10 +325,10 @@ class SearchComposioTests(TestCase):
     def test_parses_web_search_response(self, mock_post):
         mock_post.return_value = mock.Mock(json=lambda: {
             "status": 200,
-            "data": {"results": {
+            "data": {
                 "citations": [{"title": "Roof permit filed", "snippet": "City records show a roof permit", "url": "https://city.gov/permits/1", "source": "city.gov"}],
                 "organic_results": [{"title": "Tenant complaint thread", "snippet": "Leak reports", "link": "https://example.com/b", "source": "example.com"}],
-            }},
+            },
         })
         mock_post.return_value.raise_for_status = lambda: None
 
@@ -345,9 +345,9 @@ class SearchComposioTests(TestCase):
     def test_parses_news_search_response(self, mock_post):
         mock_post.return_value = mock.Mock(json=lambda: {
             "status": 200,
-            "data": {"results": {"news_results": [
+            "data": {"news_results": [
                 {"title": "Storm damages commercial roofs citywide", "snippet": "Hail storm", "link": "https://news.example.com/1", "source": "Local News"}
-            ]}},
+            ]},
         })
         mock_post.return_value.raise_for_status = lambda: None
 
@@ -397,6 +397,26 @@ class AnalyzeWithClaudeTests(TestCase):
             MockClient.return_value.messages.create.return_value = fake_message
             findings = research.analyze_with_claude(self.target, self.raw_results)
         self.assertEqual(findings, [])
+
+    @mock.patch.dict("os.environ", {"ANTHROPIC_API_KEY": "fake-key"})
+    def test_strips_markdown_code_fence_before_parsing(self):
+        fenced_response = [{"source_index": 0, "finding_type": "complaint", "summary": "Tenants report roof leak", "relevance_score": 90}]
+        fake_message = mock.Mock(content=[mock.Mock(text=f"```json\n{json.dumps(fenced_response)}\n```")])
+        with mock.patch("anthropic.Anthropic") as MockClient:
+            MockClient.return_value.messages.create.return_value = fake_message
+            findings = research.analyze_with_claude(self.target, self.raw_results)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["finding_type"], "complaint")
+
+    @mock.patch.dict("os.environ", {"ANTHROPIC_API_KEY": "fake-key"})
+    def test_disables_thinking_and_uses_sufficient_max_tokens(self):
+        fake_message = mock.Mock(content=[mock.Mock(text="[]")])
+        with mock.patch("anthropic.Anthropic") as MockClient:
+            MockClient.return_value.messages.create.return_value = fake_message
+            research.analyze_with_claude(self.target, self.raw_results)
+        _, kwargs = MockClient.return_value.messages.create.call_args
+        self.assertEqual(kwargs["thinking"], {"type": "disabled"})
+        self.assertGreaterEqual(kwargs["max_tokens"], 4096)
 
 
 class RunResearchViewTests(TestCase):

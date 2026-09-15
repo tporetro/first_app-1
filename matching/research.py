@@ -176,35 +176,56 @@ def _composio_execute(tool_slug, arguments):
     return resp.json().get("data", {})
 
 
+def _domain_from_url(url):
+    try:
+        from urllib.parse import urlparse
+        return urlparse(url).netloc or "web"
+    except ValueError:
+        return "web"
+
+
 def search_composio_web(query):
-    """General web search via Composio's keyless COMPOSIO_SEARCH_WEB tool."""
+    """General web search via Composio's keyless COMPOSIO_SEARCH_WEB tool.
+
+    The live response nests citations/organic_results directly under
+    `data` (not `data.results` as Composio's docs page describes at the
+    time this was written) -- confirmed against a real API call.
+    """
     data = _composio_execute("COMPOSIO_SEARCH_WEB", {"query": query})
     if not data:
         return []
     results = []
-    for item in data.get("results", {}).get("citations", []) or []:
+    for item in data.get("citations", []) or []:
+        title = item.get("title", "")
+        url = item.get("url", "") or item.get("id", "")
         results.append({
-            "title": item.get("title", ""),
-            "snippet": item.get("snippet", "") or item.get("text", ""),
-            "url": item.get("url", ""),
-            "source_name": item.get("source", "") or "web",
+            "title": title,
+            "snippet": item.get("snippet", "") or item.get("text", "") or title,
+            "url": url,
+            "source_name": item.get("source", "") or _domain_from_url(url),
         })
-    for item in data.get("results", {}).get("organic_results", []) or []:
+    for item in data.get("organic_results", []) or []:
+        title = item.get("title", "")
+        url = item.get("url", "") or item.get("link", "")
         results.append({
-            "title": item.get("title", ""),
-            "snippet": item.get("snippet", ""),
-            "url": item.get("url", "") or item.get("link", ""),
-            "source_name": item.get("source", "") or "web",
+            "title": title,
+            "snippet": item.get("snippet", "") or title,
+            "url": url,
+            "source_name": item.get("source", "") or _domain_from_url(url),
         })
     return results
 
 
 def search_composio_news(query):
-    """News search via Composio's keyless COMPOSIO_SEARCH_NEWS tool."""
+    """News search via Composio's keyless COMPOSIO_SEARCH_NEWS tool.
+
+    Like search_composio_web, news_results is nested directly under
+    `data`, confirmed against a real API call.
+    """
     data = _composio_execute("COMPOSIO_SEARCH_NEWS", {"query": query})
     if not data:
         return []
-    news_results = data.get("results", {}).get("news_results", []) or []
+    news_results = data.get("news_results", []) or []
     return [
         {
             "title": item.get("title", ""),
@@ -233,7 +254,8 @@ def analyze_with_claude(target, raw_results):
     )
     message = client.messages.create(
         model="claude-sonnet-5",
-        max_tokens=2000,
+        max_tokens=4096,
+        thinking={"type": "disabled"},
         system=ANALYSIS_SYSTEM_PROMPT,
         messages=[{
             "role": "user",
@@ -241,6 +263,10 @@ def analyze_with_claude(target, raw_results):
         }],
     )
     text = "".join(block.text for block in message.content if hasattr(block, "text"))
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+        text = text.rsplit("```", 1)[0]
     try:
         findings = json.loads(text)
     except json.JSONDecodeError:
