@@ -311,6 +311,53 @@ class SearchWebTests(TestCase):
         self.assertEqual(results[0]["title"], "Building permit filed")
 
 
+class SearchComposioTests(TestCase):
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_web_returns_empty_without_api_key(self):
+        self.assertEqual(research.search_composio_web("anything"), [])
+
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_news_returns_empty_without_api_key(self):
+        self.assertEqual(research.search_composio_news("anything"), [])
+
+    @mock.patch("matching.research.requests.post")
+    @mock.patch.dict("os.environ", {"COMPOSIO_API_KEY": "fake-key"})
+    def test_parses_web_search_response(self, mock_post):
+        mock_post.return_value = mock.Mock(json=lambda: {
+            "status": 200,
+            "data": {"results": {
+                "citations": [{"title": "Roof permit filed", "snippet": "City records show a roof permit", "url": "https://city.gov/permits/1", "source": "city.gov"}],
+                "organic_results": [{"title": "Tenant complaint thread", "snippet": "Leak reports", "link": "https://example.com/b", "source": "example.com"}],
+            }},
+        })
+        mock_post.return_value.raise_for_status = lambda: None
+
+        results = research.search_composio_web("Weiner Realty permit")
+
+        self.assertEqual(mock_post.call_args[0][0], f"{research.COMPOSIO_API_BASE_URL}/tools/execute/COMPOSIO_SEARCH_WEB")
+        self.assertEqual(mock_post.call_args[1]["headers"]["x-api-key"], "fake-key")
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0]["title"], "Roof permit filed")
+        self.assertEqual(results[1]["url"], "https://example.com/b")
+
+    @mock.patch("matching.research.requests.post")
+    @mock.patch.dict("os.environ", {"COMPOSIO_API_KEY": "fake-key"})
+    def test_parses_news_search_response(self, mock_post):
+        mock_post.return_value = mock.Mock(json=lambda: {
+            "status": 200,
+            "data": {"results": {"news_results": [
+                {"title": "Storm damages commercial roofs citywide", "snippet": "Hail storm", "link": "https://news.example.com/1", "source": "Local News"}
+            ]}},
+        })
+        mock_post.return_value.raise_for_status = lambda: None
+
+        results = research.search_composio_news("hail storm Brooklyn")
+
+        self.assertEqual(mock_post.call_args[0][0], f"{research.COMPOSIO_API_BASE_URL}/tools/execute/COMPOSIO_SEARCH_NEWS")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["source_name"], "Local News")
+
+
 class AnalyzeWithClaudeTests(TestCase):
     def setUp(self):
         self.target = Target.objects.create(owner_name="Shmuel Weiner", entity_name="Weiner Realty LLC")

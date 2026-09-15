@@ -94,14 +94,23 @@ personal (as opposed to corporate) philanthropy. That's enforced in both
 the search queries and the prompt sent to the analysis model, not left to
 its judgment.
 
-Requires two API keys, set as environment variables:
+Requires one API key, plus optional ones that each add another source,
+set as environment variables:
 
 - `ANTHROPIC_API_KEY` — required. Used to turn raw search snippets into
   structured, sourced findings. Without it, "Run research" fails cleanly
   with a message telling you it isn't configured.
-- `BING_SEARCH_API_KEY` — optional. Adds general web search (news,
-  permit filings, etc.) alongside Reddit. Without it, only Reddit is
-  searched.
+- `BING_SEARCH_API_KEY` — optional. Adds general web search.
+- `COMPOSIO_API_KEY` — optional. Adds Composio's keyless web and news
+  search (`COMPOSIO_SEARCH_WEB` / `COMPOSIO_SEARCH_NEWS`) as two more
+  sources, run the same way as Bing and Reddit. Get a project key at
+  <https://app.composio.dev>; no per-source setup needed beyond that.
+
+Each source is independent and additive — with none of the optional keys
+set, only Reddit's public endpoint is searched; every key you add expands
+coverage without changing what's excluded (see above: the query
+construction and the analysis prompt hold the line on scope regardless of
+how many sources feed into them).
 
 Reddit search additionally benefits from (but doesn't require) a free
 Reddit API app for reliability, since Reddit's public search endpoint is

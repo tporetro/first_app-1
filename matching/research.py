@@ -8,14 +8,17 @@ individual (life events, health, family matters, personal philanthropy).
 That line is enforced in the query construction below and again in the
 prompt sent to the analysis model, not left to the model's discretion.
 
-Requires two things to actually reach the network, both optional at
-import time so the app still runs without them (research features simply
-report they're unavailable):
+Requires an ANTHROPIC_API_KEY to actually produce findings (used to turn
+raw search snippets into structured, cited findings); everything else is
+optional at import time so the app still runs without it -- each search
+source simply reports itself unavailable and is skipped:
 
-- ANTHROPIC_API_KEY: used to turn raw search snippets into structured,
-  cited findings.
-- BING_SEARCH_API_KEY: used for general web search. Reddit search uses
-  Reddit's public, unauthenticated search endpoint and needs no key.
+- BING_SEARCH_API_KEY: general web search.
+- COMPOSIO_API_KEY: adds Composio's keyless web + news search
+  (COMPOSIO_SEARCH_WEB / COMPOSIO_SEARCH_NEWS) as extra sources.
+- REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET: reliable Reddit search via
+  Reddit's own OAuth API. Without these, Reddit search falls back to the
+  public, unauthenticated endpoint, which needs no key but is best-effort.
 """
 import json
 import os
@@ -26,6 +29,7 @@ REDDIT_PUBLIC_SEARCH_URL = "https://www.reddit.com/search.json"
 REDDIT_OAUTH_TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
 REDDIT_OAUTH_SEARCH_URL = "https://oauth.reddit.com/search"
 BING_SEARCH_URL = "https://api.bing.microsoft.com/v7.0/search"
+COMPOSIO_API_BASE_URL = "https://backend.composio.dev/api/v3.1"
 USER_AGENT = os.environ.get("REDDIT_USER_AGENT", "leadpath-property-research/1.0")
 REQUEST_TIMEOUT = 10
 
@@ -158,6 +162,60 @@ def search_web(query):
     return results
 
 
+def _composio_execute(tool_slug, arguments):
+    api_key = os.environ.get("COMPOSIO_API_KEY")
+    if not api_key:
+        return None
+    resp = requests.post(
+        f"{COMPOSIO_API_BASE_URL}/tools/execute/{tool_slug}",
+        json={"arguments": arguments, "user_id": "leadpath-property-research", "version": "latest"},
+        headers={"x-api-key": api_key},
+        timeout=REQUEST_TIMEOUT,
+    )
+    resp.raise_for_status()
+    return resp.json().get("data", {})
+
+
+def search_composio_web(query):
+    """General web search via Composio's keyless COMPOSIO_SEARCH_WEB tool."""
+    data = _composio_execute("COMPOSIO_SEARCH_WEB", {"query": query})
+    if not data:
+        return []
+    results = []
+    for item in data.get("results", {}).get("citations", []) or []:
+        results.append({
+            "title": item.get("title", ""),
+            "snippet": item.get("snippet", "") or item.get("text", ""),
+            "url": item.get("url", ""),
+            "source_name": item.get("source", "") or "web",
+        })
+    for item in data.get("results", {}).get("organic_results", []) or []:
+        results.append({
+            "title": item.get("title", ""),
+            "snippet": item.get("snippet", ""),
+            "url": item.get("url", "") or item.get("link", ""),
+            "source_name": item.get("source", "") or "web",
+        })
+    return results
+
+
+def search_composio_news(query):
+    """News search via Composio's keyless COMPOSIO_SEARCH_NEWS tool."""
+    data = _composio_execute("COMPOSIO_SEARCH_NEWS", {"query": query})
+    if not data:
+        return []
+    news_results = data.get("results", {}).get("news_results", []) or []
+    return [
+        {
+            "title": item.get("title", ""),
+            "snippet": item.get("snippet", ""),
+            "url": item.get("link", ""),
+            "source_name": item.get("source", "") or "news",
+        }
+        for item in news_results
+    ]
+
+
 def analyze_with_claude(target, raw_results):
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -213,8 +271,9 @@ def run_research(target):
     queries = build_queries(target)
     raw_results = []
     seen_urls = set()
+    fetchers = (search_reddit, search_web, search_composio_web, search_composio_news)
     for query in queries:
-        for fetch in (search_reddit, search_web):
+        for fetch in fetchers:
             try:
                 results = fetch(query)
             except requests.RequestException:
