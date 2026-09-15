@@ -131,6 +131,10 @@ set as environment variables:
   search (`COMPOSIO_SEARCH_WEB` / `COMPOSIO_SEARCH_NEWS`) as two more
   sources, run the same way as Bing and Reddit. Get a project key at
   <https://app.composio.dev>; no per-source setup needed beyond that.
+  Also enables SEC filings search for any target with a **Ticker** set
+  (only meaningful for a publicly-traded owning entity — leave it blank
+  for private LLCs, which is most hail-damage leads; nothing is ever
+  guessed).
 
 Each source is independent and additive — with none of the optional keys
 set, only Reddit's public endpoint is searched; every key you add expands
@@ -151,6 +155,31 @@ often blocked from cloud/data-center IPs:
 Without Reddit credentials, the app falls back to Reddit's public,
 unauthenticated search, which works but may be rate-limited or blocked
 depending on your hosting network.
+
+### Running research in bulk
+
+Clicking "Run research" one target at a time doesn't scale to a real
+lead list. Two options:
+
+- **"Research pending targets" button** (dashboard) — processes up to 10
+  targets that don't have a completed run yet, per click. Bounded on
+  purpose: this runs synchronously inside the HTTP request, and a large
+  batch risks a gateway timeout in production. Click it repeatedly to
+  work through a bigger backlog a page-load at a time.
+- **`bulk_research` management command** — no batch-size cap, so it's the
+  right tool for a full lead list:
+
+  ```bash
+  python manage.py bulk_research               # all targets missing a completed run
+  python manage.py bulk_research --limit 50     # cap this invocation
+  python manage.py bulk_research --force         # re-run even already-researched targets
+  ```
+
+Both paths skip a target that already has a completed (`DONE`) research
+run, so re-running costs nothing extra unless you pass `--force`. A
+per-target failure (a flaky source, one bad response) doesn't stop the
+rest of the batch; a missing `ANTHROPIC_API_KEY` aborts immediately
+instead of burning search-API calls across the whole list first.
 
 ## Notes on scope
 

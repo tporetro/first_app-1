@@ -77,6 +77,10 @@ class Target(models.Model):
 
     owner_name = models.CharField(max_length=255)
     entity_name = models.CharField(max_length=255, blank=True, help_text="LLC / holding entity, if different from owner_name")
+    ticker = models.CharField(
+        max_length=10, blank=True,
+        help_text="Stock ticker, only if the owning entity is a public company (e.g. a REIT). Leave blank for private LLCs -- enables SEC filings research when set.",
+    )
     address = models.CharField(max_length=255, blank=True)
     city = models.CharField(max_length=100, blank=True)
     state = models.CharField(max_length=50, blank=True)

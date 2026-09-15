@@ -52,6 +52,10 @@
             {% csrf_token %}
             <button type="submit">Run matching</button>
         </form>
+        <form action="{% url 'run_research_bulk' %}" method="post" style="display:inline">
+            {% csrf_token %}
+            <button type="submit" title="Processes up to 10 targets per click; use the bulk_research command for a large backlog">Research pending targets</button>
+        </form>
     </nav>
     {% endif %}
     {% block content %}{% endblock %}

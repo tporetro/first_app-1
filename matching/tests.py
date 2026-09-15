@@ -68,6 +68,15 @@ class ImporterTests(TestCase):
         self.assertEqual(records[0]["owner_name"], "Shmuel Weiner")
         self.assertEqual(records[0]["entity_name"], "Weiner Realty LLC")
         self.assertEqual(records[0]["state"], "NY")
+        self.assertEqual(records[0]["ticker"], "")
+
+    def test_parse_targets_picks_up_optional_ticker_column(self):
+        csv_with_ticker = (
+            "Owner Name,Entity Name,Ticker,City,State\n"
+            "Vornado Realty Trust,Vornado Realty Trust,VNO,New York,NY\n"
+        )
+        records = parse_targets(io.BytesIO(csv_with_ticker.encode()))
+        self.assertEqual(records[0]["ticker"], "VNO")
 
     def test_parse_facebook_export_fixes_mojibake_and_has_no_contact_info(self):
         records = parse_facebook_export(io.BytesIO(FACEBOOK_FRIENDS_JSON.encode()))
@@ -390,6 +399,46 @@ class SearchComposioTests(TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["source_name"], "Local News")
 
+    @mock.patch("matching.research.requests.post")
+    @mock.patch.dict("os.environ", {"COMPOSIO_API_KEY": "fake-key"})
+    def test_sec_filings_parses_flat_response_shape(self, mock_post):
+        mock_post.return_value = mock.Mock(json=lambda: {
+            "status": 200,
+            "data": {"filings": [
+                {"form_type": "10-K", "company_name": "Vornado Realty Trust", "filing_date": "2026-02-01", "document_url": "https://sec.gov/x"}
+            ]},
+        })
+        mock_post.return_value.raise_for_status = lambda: None
+
+        results = research.search_composio_sec_filings("VNO")
+
+        self.assertEqual(mock_post.call_args[0][0], f"{research.COMPOSIO_API_BASE_URL}/tools/execute/COMPOSIO_SEARCH_SEC_FILINGS")
+        self.assertEqual(mock_post.call_args[1]["json"]["arguments"]["ticker_or_cik"], "VNO")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["source_name"], "SEC EDGAR")
+        self.assertIn("10-K", results[0]["snippet"])
+
+    @mock.patch("matching.research.requests.post")
+    @mock.patch.dict("os.environ", {"COMPOSIO_API_KEY": "fake-key"})
+    def test_sec_filings_parses_nested_results_shape(self, mock_post):
+        """Composio's docs describe results nested under 'results.filings' --
+        support that shape too, in case a future response matches the docs
+        rather than the flat shape a live web/news call actually returned."""
+        mock_post.return_value = mock.Mock(json=lambda: {
+            "status": 200,
+            "data": {"results": {"filings": [
+                {"form_type": "8-K", "company_name": "Vornado Realty Trust", "filing_date": "2026-03-01", "document_url": "https://sec.gov/y"}
+            ]}},
+        })
+        mock_post.return_value.raise_for_status = lambda: None
+
+        results = research.search_composio_sec_filings("VNO")
+        self.assertEqual(len(results), 1)
+
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_sec_filings_returns_empty_without_api_key(self):
+        self.assertEqual(research.search_composio_sec_filings("VNO"), [])
+
 
 class AnalyzeWithClaudeTests(TestCase):
     def setUp(self):
@@ -467,7 +516,7 @@ class RunResearchViewTests(TestCase):
         response = self.client.get(f"/targets/{self.target.pk}/run-research/")
         self.assertEqual(response.status_code, 405)
 
-    @mock.patch("matching.views.run_research")
+    @mock.patch("matching.research.run_research")
     def test_creates_findings_on_success(self, mock_run_research):
         mock_run_research.return_value = [{
             "finding_type": "damage", "summary": "Storm damage reported", "relevance_score": 88,
@@ -480,7 +529,7 @@ class RunResearchViewTests(TestCase):
         self.assertEqual(run.status, PropertyResearchRun.Status.DONE)
         self.assertContains(response, "Found 1 finding")
 
-    @mock.patch("matching.views.run_research")
+    @mock.patch("matching.research.run_research")
     def test_reports_unavailable_without_crashing(self, mock_run_research):
         mock_run_research.side_effect = research.ResearchUnavailable("ANTHROPIC_API_KEY is not configured.")
         response = self.client.post(f"/targets/{self.target.pk}/run-research/", follow=True)
@@ -488,6 +537,158 @@ class RunResearchViewTests(TestCase):
         run = PropertyResearchRun.objects.get(target=self.target)
         self.assertEqual(run.status, PropertyResearchRun.Status.FAILED)
         self.assertContains(response, "Research isn&#x27;t configured yet")
+
+
+class RunResearchTickerGatingTests(TestCase):
+    """run_research() should only call SEC filings search when a ticker
+    is actually set -- never guess one for a private LLC."""
+
+    @mock.patch("matching.research.search_composio_sec_filings")
+    @mock.patch("matching.research.analyze_with_claude", return_value=[])
+    @mock.patch("matching.research.search_composio_news", return_value=[])
+    @mock.patch("matching.research.search_composio_web", return_value=[])
+    @mock.patch("matching.research.search_web", return_value=[])
+    @mock.patch("matching.research.search_reddit", return_value=[])
+    def test_skips_sec_filings_when_no_ticker(self, mock_reddit, mock_web, mock_cweb, mock_cnews, mock_analyze, mock_sec):
+        target = Target(owner_name="Jane Doe", entity_name="Doe Realty LLC", ticker="")
+        research.run_research(target)
+        mock_sec.assert_not_called()
+
+    @mock.patch("matching.research.search_composio_sec_filings", return_value=[])
+    @mock.patch("matching.research.analyze_with_claude", return_value=[])
+    @mock.patch("matching.research.search_composio_news", return_value=[])
+    @mock.patch("matching.research.search_composio_web", return_value=[])
+    @mock.patch("matching.research.search_web", return_value=[])
+    @mock.patch("matching.research.search_reddit", return_value=[])
+    def test_calls_sec_filings_when_ticker_set(self, mock_reddit, mock_web, mock_cweb, mock_cnews, mock_analyze, mock_sec):
+        target = Target(owner_name="Vornado Realty Trust", entity_name="Vornado Realty Trust", ticker="VNO")
+        research.run_research(target)
+        mock_sec.assert_called_once_with("VNO")
+
+
+class PersistResearchRunTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="researcher1", password="x")
+        self.target = Target.objects.create(owner_name="Jane Doe")
+
+    @mock.patch("matching.research.run_research")
+    def test_saves_findings_and_marks_done(self, mock_run_research):
+        mock_run_research.return_value = [
+            {"finding_type": "permit", "summary": "Roof permit filed", "relevance_score": 70, "source_url": "https://x.com/1", "source_name": "x"},
+        ]
+        run, findings = research.persist_research_run(self.target, requested_by=self.user)
+        self.assertEqual(run.status, PropertyResearchRun.Status.DONE)
+        self.assertEqual(run.requested_by, self.user)
+        self.assertEqual(PropertyFinding.objects.filter(target=self.target).count(), 1)
+        self.assertEqual(len(findings), 1)
+
+    @mock.patch("matching.research.run_research")
+    def test_marks_failed_and_reraises_on_error(self, mock_run_research):
+        mock_run_research.side_effect = research.ResearchUnavailable("no key")
+        with self.assertRaises(research.ResearchUnavailable):
+            research.persist_research_run(self.target, requested_by=self.user)
+        run = PropertyResearchRun.objects.get(target=self.target)
+        self.assertEqual(run.status, PropertyResearchRun.Status.FAILED)
+        self.assertEqual(run.error_message, "no key")
+
+
+class RunBulkResearchTests(TestCase):
+    def setUp(self):
+        self.targets = [Target.objects.create(owner_name=f"Owner {i}") for i in range(3)]
+
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_raises_immediately_without_anthropic_key(self):
+        with self.assertRaises(research.ResearchUnavailable):
+            research.run_bulk_research(Target.objects.all())
+
+    @mock.patch("matching.research.persist_research_run")
+    @mock.patch.dict("os.environ", {"ANTHROPIC_API_KEY": "fake-key"})
+    def test_processes_all_targets_and_sums_findings(self, mock_persist):
+        mock_persist.return_value = (mock.Mock(), [{"finding_type": "news", "summary": "x", "relevance_score": 10}])
+        summary = research.run_bulk_research(Target.objects.all())
+        self.assertEqual(summary["processed"], 3)
+        self.assertEqual(summary["total_findings"], 3)
+        self.assertEqual(summary["failed"], [])
+
+    @mock.patch("matching.research.persist_research_run")
+    @mock.patch.dict("os.environ", {"ANTHROPIC_API_KEY": "fake-key"})
+    def test_respects_limit(self, mock_persist):
+        mock_persist.return_value = (mock.Mock(), [])
+        research.run_bulk_research(Target.objects.all(), limit=2)
+        self.assertEqual(mock_persist.call_count, 2)
+
+    @mock.patch("matching.research.persist_research_run")
+    @mock.patch.dict("os.environ", {"ANTHROPIC_API_KEY": "fake-key"})
+    def test_one_failure_does_not_stop_the_batch(self, mock_persist):
+        mock_persist.side_effect = [
+            (mock.Mock(), []),
+            Exception("boom"),
+            (mock.Mock(), []),
+        ]
+        summary = research.run_bulk_research(Target.objects.all())
+        self.assertEqual(summary["processed"], 2)
+        self.assertEqual(len(summary["failed"]), 1)
+
+
+class BulkResearchCommandTests(TestCase):
+    def setUp(self):
+        self.target = Target.objects.create(owner_name="Jane Doe")
+
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_raises_command_error_without_anthropic_key(self):
+        from django.core.management.base import CommandError
+        with self.assertRaises(CommandError):
+            call_command("bulk_research")
+
+    def test_no_pending_targets_prints_warning(self):
+        PropertyResearchRun.objects.create(target=self.target, status=PropertyResearchRun.Status.DONE)
+        out = io.StringIO()
+        call_command("bulk_research", stdout=out)
+        self.assertIn("No targets need research", out.getvalue())
+
+    @mock.patch("matching.management.commands.bulk_research.run_bulk_research")
+    def test_reports_summary(self, mock_bulk):
+        mock_bulk.return_value = {"processed": 1, "total_findings": 2, "failed": []}
+        out = io.StringIO()
+        call_command("bulk_research", stdout=out)
+        self.assertIn("Processed 1 target(s), 2 finding(s)", out.getvalue())
+
+    def test_force_includes_already_researched_targets(self):
+        PropertyResearchRun.objects.create(target=self.target, status=PropertyResearchRun.Status.DONE)
+        with mock.patch("matching.management.commands.bulk_research.run_bulk_research") as mock_bulk:
+            mock_bulk.return_value = {"processed": 1, "total_findings": 0, "failed": []}
+            call_command("bulk_research", "--force", stdout=io.StringIO())
+        called_targets = list(mock_bulk.call_args[0][0])
+        self.assertIn(self.target, called_targets)
+
+
+class BulkRunResearchViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="researcher2", password="x")
+        self.client.force_login(self.user)
+
+    def test_requires_login(self):
+        self.client.logout()
+        response = self.client.post("/run-research-bulk/")
+        self.assertEqual(response.status_code, 302)
+
+    def test_no_pending_targets(self):
+        response = self.client.post("/run-research-bulk/", follow=True)
+        self.assertContains(response, "No targets are pending research")
+
+    @mock.patch("matching.views.run_bulk_research")
+    def test_reports_unavailable_without_crashing(self, mock_bulk):
+        Target.objects.create(owner_name="Jane Doe")
+        mock_bulk.side_effect = research.ResearchUnavailable("no key")
+        response = self.client.post("/run-research-bulk/", follow=True)
+        self.assertContains(response, "Research isn&#x27;t configured yet")
+
+    @mock.patch("matching.views.run_bulk_research")
+    def test_success_message_reports_counts(self, mock_bulk):
+        Target.objects.create(owner_name="Jane Doe")
+        mock_bulk.return_value = {"processed": 1, "total_findings": 4, "failed": []}
+        response = self.client.post("/run-research-bulk/", follow=True)
+        self.assertContains(response, "Researched 1 target(s), found 4 finding(s)")
 
 
 class TargetDetailViewTests(TestCase):

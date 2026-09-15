@@ -179,6 +179,7 @@ def parse_targets(file_obj):
 
     col_owner = _find_column(headers, ["owner name", "owner", "name"])
     col_entity = _find_column(headers, ["entity name", "entity", "llc", "business name"])
+    col_ticker = _find_column(headers, ["ticker", "stock ticker", "symbol"])
     col_address = _find_column(headers, ["address", "street"])
     col_city = _find_column(headers, ["city"])
     col_state = _find_column(headers, ["state"])
@@ -198,6 +199,7 @@ def parse_targets(file_obj):
         results.append({
             "owner_name": owner_name,
             "entity_name": record.get(col_entity, "").strip() if col_entity else "",
+            "ticker": record.get(col_ticker, "").strip() if col_ticker else "",
             "address": record.get(col_address, "").strip() if col_address else "",
             "city": record.get(col_city, "").strip() if col_city else "",
             "state": record.get(col_state, "").strip() if col_state else "",

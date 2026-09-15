@@ -70,9 +70,9 @@ class PropertyFindingInline(admin.TabularInline):
 
 @admin.register(Target)
 class TargetAdmin(admin.ModelAdmin):
-    list_display = ("owner_name", "entity_name", "city", "state", "damage_date", "match_status", "finding_count")
+    list_display = ("owner_name", "entity_name", "ticker", "city", "state", "damage_date", "match_status", "finding_count")
     list_filter = ("state", "damage_type")
-    search_fields = ("owner_name", "entity_name", "address", "city")
+    search_fields = ("owner_name", "entity_name", "ticker", "address", "city")
     inlines = [MatchInline, PropertyFindingInline]
 
     @admin.display(description="Findings")

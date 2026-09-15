@@ -141,6 +141,7 @@ def import_targets_from_file(file_obj, file_name=""):
                 import_batch=batch,
                 owner_name=r["owner_name"],
                 entity_name=r.get("entity_name", ""),
+                ticker=r.get("ticker", ""),
                 address=r.get("address", ""),
                 city=r.get("city", ""),
                 state=r.get("state", ""),

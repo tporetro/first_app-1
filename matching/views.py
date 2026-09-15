@@ -6,13 +6,12 @@ from django.db.models import Prefetch
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
-from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, FormView, ListView
 
 from .forms import ContactImportForm, SingleContactForm, TargetImportForm
 from .models import Contact, Match, PropertyResearchRun, Target
-from .research import ResearchUnavailable, run_research
+from .research import ResearchUnavailable, persist_research_run, run_bulk_research
 from .services import (
     ImportError_,
     create_manual_contacts,
@@ -193,41 +192,50 @@ class RunResearchView(LoginRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         target = get_object_or_404(Target, pk=kwargs["pk"])
-        run = PropertyResearchRun.objects.create(
-            target=target, requested_by=request.user, status=PropertyResearchRun.Status.RUNNING
-        )
         try:
-            findings = run_research(target)
+            run, findings = persist_research_run(target, requested_by=request.user)
         except ResearchUnavailable as e:
-            run.status = PropertyResearchRun.Status.FAILED
-            run.error_message = str(e)
-            run.finished_at = timezone.now()
-            run.save()
             messages.error(request, f"Research isn't configured yet: {e}")
             return redirect("target_detail", pk=target.pk)
         except Exception as e:
-            run.status = PropertyResearchRun.Status.FAILED
-            run.error_message = str(e)
-            run.finished_at = timezone.now()
-            run.save()
             messages.error(request, f"Research failed: {e}")
             return redirect("target_detail", pk=target.pk)
-
-        for f in findings:
-            run.findings.create(
-                target=target,
-                finding_type=f["finding_type"],
-                summary=f["summary"],
-                relevance_score=f["relevance_score"],
-                source_url=f.get("source_url", ""),
-                source_name=f.get("source_name", ""),
-            )
-        run.status = PropertyResearchRun.Status.DONE
-        run.finished_at = timezone.now()
-        run.save()
 
         if findings:
             messages.success(request, f"Found {len(findings)} finding(s) about the property/entity.")
         else:
             messages.info(request, "No relevant property/entity findings surfaced in this pass.")
         return redirect("target_detail", pk=target.pk)
+
+
+class BulkRunResearchView(LoginRequiredMixin, View):
+    """POST-only trigger to run research across multiple targets that
+    don't have a completed run yet. Bounded to a small batch per click
+    since this runs synchronously within the request/response cycle --
+    for a large backlog, use the bulk_research management command
+    instead, which has no such bound."""
+
+    BATCH_SIZE = 10
+
+    def post(self, request, *args, **kwargs):
+        pending = Target.objects.exclude(research_runs__status=PropertyResearchRun.Status.DONE)
+        total_pending = pending.count()
+
+        if total_pending == 0:
+            messages.info(request, "No targets are pending research.")
+            return redirect("dashboard")
+
+        try:
+            summary = run_bulk_research(pending, requested_by=request.user, limit=self.BATCH_SIZE)
+        except ResearchUnavailable as e:
+            messages.error(request, f"Research isn't configured yet: {e}")
+            return redirect("dashboard")
+
+        remaining = total_pending - summary["processed"]
+        msg = f"Researched {summary['processed']} target(s), found {summary['total_findings']} finding(s) total."
+        if summary["failed"]:
+            msg += f" {len(summary['failed'])} failed."
+        if remaining > 0:
+            msg += f" {remaining} target(s) still pending -- click again, or use the bulk_research command for the rest."
+        messages.success(request, msg)
+        return redirect("dashboard")

@@ -5,6 +5,7 @@ from django.urls import path
 from matching.views import (
     AddContactView,
     BulkAddContactsView,
+    BulkRunResearchView,
     ContactImportView,
     DashboardView,
     RunMatchingView,
@@ -23,6 +24,7 @@ urlpatterns = [
     path("contacts/add/", AddContactView.as_view(), name="add_contact"),
     path("contacts/add/bulk/", BulkAddContactsView.as_view(), name="bulk_add_contacts"),
     path("run-matching/", RunMatchingView.as_view(), name="run_matching"),
+    path("run-research-bulk/", BulkRunResearchView.as_view(), name="run_research_bulk"),
     path("targets/<int:pk>/", TargetDetailView.as_view(), name="target_detail"),
     path("targets/<int:pk>/run-research/", RunResearchView.as_view(), name="run_research"),
 ]

@@ -24,6 +24,7 @@ import json
 import os
 
 import requests
+from django.utils import timezone
 
 REDDIT_PUBLIC_SEARCH_URL = "https://www.reddit.com/search.json"
 REDDIT_OAUTH_TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
@@ -237,6 +238,40 @@ def search_composio_news(query):
     ]
 
 
+def search_composio_sec_filings(ticker_or_cik):
+    """SEC filings via Composio's keyless COMPOSIO_SEARCH_SEC_FILINGS tool.
+
+    Only meaningful for a publicly-traded owning entity (a ticker or CIK
+    -- most commercial LLCs don't have one, so callers should only invoke
+    this when Target.ticker is actually set, never guess one).
+
+    Composio's docs describe the response as nested under
+    "results.filings", but the WEB/NEWS tools in this same toolkit turned
+    out to nest directly under "data" instead of matching their docs --
+    so this checks both shapes rather than trusting either blindly.
+    """
+    data = _composio_execute("COMPOSIO_SEARCH_SEC_FILINGS", {"ticker_or_cik": ticker_or_cik, "limit": 10})
+    if not data:
+        return []
+    filings = data.get("filings")
+    if filings is None:
+        filings = (data.get("results") or {}).get("filings")
+    if not filings:
+        return []
+
+    results = []
+    for item in filings:
+        title = item.get("title") or f"{item.get('form_type', 'SEC filing')} - {item.get('company_name', ticker_or_cik)}"
+        url = item.get("document_url") or item.get("index_url") or item.get("url", "")
+        results.append({
+            "title": title,
+            "snippet": f"{item.get('form_type', '')} filed {item.get('filing_date', '')} by {item.get('company_name', ticker_or_cik)}",
+            "url": url,
+            "source_name": "SEC EDGAR",
+        })
+    return results
+
+
 def analyze_with_claude(target, raw_results):
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -310,4 +345,82 @@ def run_research(target):
                 seen_urls.add(r["url"])
                 raw_results.append(r)
 
+    ticker = getattr(target, "ticker", "")
+    if ticker:
+        try:
+            for r in search_composio_sec_filings(ticker):
+                if r["url"] and r["url"] in seen_urls:
+                    continue
+                seen_urls.add(r["url"])
+                raw_results.append(r)
+        except requests.RequestException:
+            pass
+
     return analyze_with_claude(target, raw_results)
+
+
+def persist_research_run(target, requested_by=None):
+    """Runs research for one target and saves a PropertyResearchRun plus
+    its PropertyFinding rows. Shared by the single-target view, the bulk
+    view, and the bulk management command, so there's one "run and save"
+    code path regardless of caller. Re-raises ResearchUnavailable /
+    other exceptions after recording the failed run, so callers can
+    still react to the specific error.
+    """
+    from .models import PropertyResearchRun
+
+    run = PropertyResearchRun.objects.create(
+        target=target, requested_by=requested_by, status=PropertyResearchRun.Status.RUNNING
+    )
+    try:
+        findings = run_research(target)
+    except Exception as e:
+        run.status = PropertyResearchRun.Status.FAILED
+        run.error_message = str(e)
+        run.finished_at = timezone.now()
+        run.save()
+        raise
+
+    for f in findings:
+        run.findings.create(
+            target=target,
+            finding_type=f["finding_type"],
+            summary=f["summary"],
+            relevance_score=f["relevance_score"],
+            source_url=f.get("source_url", ""),
+            source_name=f.get("source_name", ""),
+        )
+    run.status = PropertyResearchRun.Status.DONE
+    run.finished_at = timezone.now()
+    run.save()
+    return run, findings
+
+
+def run_bulk_research(targets, requested_by=None, limit=None):
+    """Runs research across multiple targets. Checks ANTHROPIC_API_KEY
+    once up front so a missing key fails immediately instead of burning
+    search-API calls across many targets before discovering the analysis
+    step can't run.
+
+    Returns {"processed": int, "total_findings": int, "failed": [(target, error), ...]}.
+    A per-target failure (a flaky search source, one bad response) does
+    not stop the batch; only a missing ANTHROPIC_API_KEY aborts upfront.
+    """
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise ResearchUnavailable("ANTHROPIC_API_KEY is not configured.")
+
+    if limit is not None:
+        targets = targets[:limit]
+
+    processed = 0
+    total_findings = 0
+    failed = []
+    for target in targets:
+        try:
+            _, findings = persist_research_run(target, requested_by=requested_by)
+            processed += 1
+            total_findings += len(findings)
+        except Exception as e:
+            failed.append((target, str(e)))
+
+    return {"processed": processed, "total_findings": total_findings, "failed": failed}
