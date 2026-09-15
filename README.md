@@ -181,12 +181,45 @@ per-target failure (a flaky source, one bad response) doesn't stop the
 rest of the batch; a missing `ANTHROPIC_API_KEY` aborts immediately
 instead of burning search-API calls across the whole list first.
 
+## Deploying to Render
+
+`render.yaml` in the repo root defines everything Render needs: a web
+service (gunicorn, static files via WhiteNoise, migrations run on every
+deploy) and a free Postgres database, wired together automatically.
+
+1. Push this repo to GitHub (already done if you're reading this from
+   the repo).
+2. In the Render dashboard: **New** -> **Blueprint**, select this repo.
+   Render reads `render.yaml` and provisions the web service + database
+   together. `DJANGO_SECRET_KEY` is generated automatically and
+   `DATABASE_URL` is wired from the database to the web service -- no
+   manual setup for either.
+3. Once the first deploy finishes, open the web service's **Shell** tab
+   and run:
+   ```bash
+   python manage.py createsuperuser
+   ```
+   Repeat once per partner (or create the rest via `/admin/` afterward).
+4. In the web service's **Environment** tab, add whichever of the
+   property-research keys you want live (`ANTHROPIC_API_KEY` is the only
+   one that's required for that feature; `BING_SEARCH_API_KEY`,
+   `COMPOSIO_API_KEY`, `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` are all
+   optional additive sources -- see **Property/entity research** above).
+   Everything else in the app works without any of these.
+5. Every subsequent `git push` to this branch redeploys automatically
+   (collectstatic + migrate run as part of the build, per `render.yaml`).
+
+Deploying elsewhere (Railway, Fly.io, a VPS, ...) works the same way in
+spirit: gunicorn as the WSGI server, `DATABASE_URL` for Postgres (parsed
+via `dj-database-url`), `python manage.py collectstatic` and `migrate` on
+deploy, and the same environment variables listed throughout this file.
+
 ## Notes on scope
 
 - Contacts are private to the importing partner by default (non-superuser
   admin users only see their own imported contacts).
 - The match threshold is tunable via the `MATCH_SCORE_THRESHOLD` env var
   (default 82, on a 0-100 fuzzy-match scale).
-- For production use, set `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=false`, and
-  `DJANGO_ALLOWED_HOSTS`, and swap the default SQLite database for
-  Postgres in `leadpath/settings.py`.
+- Locally, the app runs on SQLite with no setup. In production
+  (`DATABASE_URL` set, e.g. by Render), it automatically switches to
+  Postgres -- see **Deploying to Render** above.
