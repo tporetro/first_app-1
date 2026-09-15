@@ -85,6 +85,8 @@ class Target(models.Model):
     city = models.CharField(max_length=100, blank=True)
     state = models.CharField(max_length=50, blank=True)
     zip_code = models.CharField(max_length=20, blank=True)
+    phone = models.CharField(max_length=50, blank=True, help_text="Owner's direct phone, if known -- for reaching them without a warm path")
+    email = models.EmailField(blank=True, help_text="Owner's direct email, if known -- for reaching them without a warm path")
     damage_type = models.CharField(max_length=100, default="hail")
     damage_date = models.DateField(null=True, blank=True)
     source_notes = models.TextField(blank=True)

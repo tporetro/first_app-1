@@ -78,6 +78,48 @@ class ImporterTests(TestCase):
         records = parse_targets(io.BytesIO(csv_with_ticker.encode()))
         self.assertEqual(records[0]["ticker"], "VNO")
 
+    def test_parse_targets_handles_hubspot_style_crm_export(self):
+        hubspot_csv = (
+            "First Name,Last Name,Company Name,Phone,Mobile Phone,Email,Email 2,Deal,Contact\n"
+            'Kirk,Schell,"Gt Doering Partners, LLC",1-512-484-8146,,kschell@boxx.com,kirkschell@boxx.com,'
+            '"712 S Austin Ave, Georgetown, TX 78626","Kirk Schell, Chief Executive Officer / Principal"\n'
+        )
+        records = parse_targets(io.BytesIO(hubspot_csv.encode()))
+        self.assertEqual(len(records), 1)
+        r = records[0]
+        self.assertEqual(r["owner_name"], "Kirk Schell")
+        self.assertEqual(r["entity_name"], "Gt Doering Partners, LLC")
+        self.assertEqual(r["address"], "712 S Austin Ave")
+        self.assertEqual(r["city"], "Georgetown")
+        self.assertEqual(r["state"], "TX")
+        self.assertEqual(r["zip_code"], "78626")
+        self.assertEqual(r["phone"], "1-512-484-8146")
+        self.assertEqual(r["email"], "kschell@boxx.com")
+        self.assertEqual(r["source_notes"], "Kirk Schell, Chief Executive Officer / Principal")
+
+    def test_parse_targets_does_not_confuse_property_name_with_owner_name(self):
+        """Regression test: a bare 'name' substring match previously let
+        a Property_Name column masquerade as the owner name."""
+        property_csv = (
+            "Property_Name,Street_Address,City,State,ZIP\n"
+            "100 Congress,100 Congress Avenue,Austin,TX,78701\n"
+        )
+        records = parse_targets(io.BytesIO(property_csv.encode()))
+        self.assertEqual(records, [])
+
+    def test_split_combined_address_handles_normal_shape(self):
+        from matching.importers import _split_combined_address
+        parsed = _split_combined_address("400 W Cesar Chavez St, Austin, TX 78701")
+        self.assertEqual(parsed["street"], "400 W Cesar Chavez St")
+        self.assertEqual(parsed["city"], "Austin")
+        self.assertEqual(parsed["state"], "TX")
+        self.assertEqual(parsed["zip"], "78701")
+
+    def test_split_combined_address_returns_none_for_unrecognized_shape(self):
+        from matching.importers import _split_combined_address
+        self.assertIsNone(_split_combined_address("just some text"))
+        self.assertIsNone(_split_combined_address(""))
+
     def test_parse_facebook_export_fixes_mojibake_and_has_no_contact_info(self):
         records = parse_facebook_export(io.BytesIO(FACEBOOK_FRIENDS_JSON.encode()))
         self.assertEqual(len(records), 2)

@@ -13,6 +13,12 @@
     {{ target.entity_name }}<br>
     {{ target.address }} {{ target.city }}{% if target.city and target.state %}, {% endif %}{{ target.state }} {{ target.zip_code }}<br>
     Damage: {{ target.damage_type }}{% if target.damage_date %} on {{ target.damage_date }}{% endif %}
+    {% if target.phone or target.email %}<br>
+    Direct: {% if target.phone %}{{ target.phone }}{% endif %}{% if target.phone and target.email %} &middot; {% endif %}{% if target.email %}{{ target.email }}{% endif %}
+    {% endif %}
+    {% if target.source_notes %}<br>
+    <em>{{ target.source_notes }}</em>
+    {% endif %}
 </p>
 
 <h3>Connection paths</h3>

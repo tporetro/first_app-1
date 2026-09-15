@@ -9,6 +9,7 @@ rather than requiring an exact format.
 import csv
 import io
 import json
+import re
 
 
 def _normalize(header):
@@ -170,43 +171,97 @@ def parse_generic_contacts(file_obj):
     return results
 
 
+_COMBINED_ADDRESS_RE = re.compile(
+    r"^(?P<street>.+?),\s*(?P<city>[^,]+?),\s*(?P<state>[A-Za-z]{2})\s+(?P<zip>\d{5}(?:-\d{4})?)$"
+)
+
+
+def _split_combined_address(value):
+    """Splits a single "123 Main St, Austin, TX 78701"-style field into
+    parts. Returns None if it doesn't look like that shape, so the
+    caller can fall back to storing the whole string as-is."""
+    if not value:
+        return None
+    match = _COMBINED_ADDRESS_RE.match(value.strip())
+    return match.groupdict() if match else None
+
+
 def parse_targets(file_obj):
-    """Parse a commercial-building-owner / hail-damage target list CSV."""
+    """Parse a commercial-building-owner / hail-damage target list CSV.
+
+    Column names vary a lot by source. Supports both a clean, dedicated
+    Owner Name / Address / City / State / Zip layout and a CRM-style
+    export (First Name / Last Name / Company Name / a single combined
+    address field like HubSpot's "Deal" column).
+    """
     rows = _read_rows(file_obj)
     if not rows:
         return []
     headers = rows[0]
 
-    col_owner = _find_column(headers, ["owner name", "owner", "name"])
-    col_entity = _find_column(headers, ["entity name", "entity", "llc", "business name"])
+    col_owner = _find_column(headers, ["owner name", "owner"])
+    col_first = _find_column(headers, ["first name"])
+    col_last = _find_column(headers, ["last name"])
+    col_entity = _find_column(headers, ["entity name", "entity", "llc", "business name", "company name", "company"])
     col_ticker = _find_column(headers, ["ticker", "stock ticker", "symbol"])
     col_address = _find_column(headers, ["address", "street"])
+    col_combined_address = _find_column(headers, ["deal", "full address"])
     col_city = _find_column(headers, ["city"])
     col_state = _find_column(headers, ["state"])
     col_zip = _find_column(headers, ["zip", "zip code", "postal code"])
+    col_phone = _find_column(headers, ["phone", "mobile phone"])
+    col_email = _find_column(headers, ["email"])
     col_damage_type = _find_column(headers, ["damage type", "damage"])
     col_damage_date = _find_column(headers, ["damage date", "date"])
     col_notes = _find_column(headers, ["notes", "source"])
+    col_contact_title = _find_column(headers, ["contact"])
 
     results = []
     for row in rows[1:]:
         if not any(row):
             continue
         record = dict(zip(headers, row))
+
         owner_name = record.get(col_owner, "").strip() if col_owner else ""
+        if not owner_name and (col_first or col_last):
+            first = record.get(col_first, "").strip() if col_first else ""
+            last = record.get(col_last, "").strip() if col_last else ""
+            owner_name = f"{first} {last}".strip()
         if not owner_name:
             continue
+
+        address = record.get(col_address, "").strip() if col_address else ""
+        city = record.get(col_city, "").strip() if col_city else ""
+        state = record.get(col_state, "").strip() if col_state else ""
+        zip_code = record.get(col_zip, "").strip() if col_zip else ""
+        if not address and col_combined_address:
+            combined = record.get(col_combined_address, "").strip()
+            parsed = _split_combined_address(combined)
+            if parsed:
+                address = parsed["street"]
+                city = city or parsed["city"]
+                state = state or parsed["state"]
+                zip_code = zip_code or parsed["zip"]
+            else:
+                address = combined
+
+        source_notes = record.get(col_notes, "").strip() if col_notes else ""
+        if not source_notes and col_contact_title:
+            source_notes = record.get(col_contact_title, "").strip()
+
         results.append({
             "owner_name": owner_name,
             "entity_name": record.get(col_entity, "").strip() if col_entity else "",
             "ticker": record.get(col_ticker, "").strip() if col_ticker else "",
-            "address": record.get(col_address, "").strip() if col_address else "",
-            "city": record.get(col_city, "").strip() if col_city else "",
-            "state": record.get(col_state, "").strip() if col_state else "",
-            "zip_code": record.get(col_zip, "").strip() if col_zip else "",
+            "address": address,
+            "city": city,
+            "state": state,
+            "zip_code": zip_code,
+            "phone": record.get(col_phone, "").strip() if col_phone else "",
+            "email": record.get(col_email, "").strip() if col_email else "",
             "damage_type": (record.get(col_damage_type, "").strip() if col_damage_type else "") or "hail",
             "damage_date": record.get(col_damage_date, "").strip() if col_damage_date else "",
-            "source_notes": record.get(col_notes, "").strip() if col_notes else "",
+            "source_notes": source_notes,
             "raw_data": record,
         })
     return results
