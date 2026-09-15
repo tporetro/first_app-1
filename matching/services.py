@@ -194,7 +194,21 @@ def run_matching(threshold=None):
                 if score >= threshold:
                     matched_on.append(f"entity name ~ contact company ({score:.0f}%)")
 
-            if target_owner_norm and contact_company_norm:
+            # token_set_ratio scores 100% whenever one side's tokens are a
+            # full subset of the other's, regardless of length. That's
+            # exactly what makes it useful for "Jane Smith" matching inside
+            # "Jane Smith Family Trust" -- but normalize()'s suffix-stripping
+            # (Realty, Properties, ...) routinely reduces a company name down
+            # to a single bare word (a surname, a generic term), and that
+            # single word being a subset of a long owner name is meaningless,
+            # not a real signal. Require at least 2 tokens on both sides so
+            # the comparison only fires when there's enough content for
+            # "fully contained" to actually mean something.
+            if (
+                target_owner_norm and contact_company_norm
+                and len(target_owner_norm.split()) >= 2
+                and len(contact_company_norm.split()) >= 2
+            ):
                 score = fuzz.token_set_ratio(target_owner_norm, contact_company_norm)
                 best_score = max(best_score, score)
                 if score >= threshold:

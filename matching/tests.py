@@ -306,6 +306,48 @@ class MatchingCommandTests(TestCase):
         self.assertEqual(refreshed.best_match.status, Match.Status.REJECTED)
 
 
+class MatchingFalsePositiveRegressionTests(TestCase):
+    """Regression tests for a real bug found against a live 308-target /
+    8,039-contact dataset: token_set_ratio scores 100% whenever one
+    side's tokens are a full subset of the other's, and normalize()'s
+    suffix-stripping routinely reduces a company name down to a single
+    bare word -- a false "100% match" whenever that word coincidentally
+    appears anywhere in an unrelated owner's name. 13 of 39 matches in
+    that real run were exactly this failure before the fix."""
+
+    def setUp(self):
+        self.partner = User.objects.create_user(username="researcher3", password="x")
+
+    def _contact(self, full_name, company=""):
+        return Contact.objects.create(partner=self.partner, full_name=full_name, company=company)
+
+    def test_garbage_single_letter_company_does_not_match_a_middle_initial(self):
+        target = Target.objects.create(owner_name="Deanne F Rienstra", entity_name="Tarrytown Methodist Church")
+        self._contact("Dropped Pin", company="F")
+        call_command("run_matching")
+        self.assertEqual(Match.objects.count(), 0)
+
+    def test_coincidental_surname_after_suffix_stripping_does_not_match(self):
+        # "Morris Realty" normalizes to just "morris" once the "Realty"
+        # suffix is stripped -- that bare surname is not a real signal
+        # just because it also appears in an unrelated owner's name.
+        target = Target.objects.create(owner_name="Morris Bracey", entity_name="Dealers Electrical Supply Co")
+        self._contact("Randy Morris", company="Morris Realty")
+        call_command("run_matching")
+        self.assertEqual(Match.objects.count(), 0)
+
+    def test_full_name_genuinely_contained_in_a_longer_company_name_still_matches(self):
+        # The legitimate case token_set_ratio exists for: both sides have
+        # enough tokens for "fully contained" to mean something real.
+        # entity_name is left blank so only the owner~company cross-check
+        # (the path being fixed) can produce this match, isolating it from
+        # the separate entity~company comparison.
+        target = Target.objects.create(owner_name="Jane Smith", entity_name="")
+        contact = self._contact("Someone Else", company="Jane Smith Family Trust")
+        call_command("run_matching")
+        self.assertEqual(Match.objects.filter(target=target, contact=contact).count(), 1)
+
+
 class DashboardViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="mendel", password="x")
