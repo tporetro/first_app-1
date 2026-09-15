@@ -7,7 +7,8 @@ it never scrapes or collects data on anyone outside your own network.
 ## What it does
 
 1. Each partner imports **their own** contacts: a LinkedIn data export, a
-   phone contacts export, or an email address book export.
+   Facebook friends export, a phone contacts export, or an email address
+   book export.
 2. You import your list of targets (e.g. commercial building owners with
    hail damage), typically sourced from public property records.
 3. A fuzzy-matching pass compares names/companies and flags candidate
@@ -34,7 +35,7 @@ python manage.py runserver
 Visit `http://127.0.0.1:8000/` and log in to reach:
 
 - **Dashboard** (`/`) — ranked list of targets with their best known path
-- **Import my contacts** (`/import/contacts/`) — upload your own LinkedIn/phone/email export as the logged-in partner
+- **Import my contacts** (`/import/contacts/`) — upload your own LinkedIn/Facebook/phone/email export as the logged-in partner
 - **Add a contact** (`/contacts/add/`) — add one contact by hand, or on
   supported browsers (mainly Android Chrome/Edge — not iOS Safari or
   desktop) pick straight from your phone's contact list via the browser's
@@ -59,6 +60,12 @@ is also available from the command line, e.g. for scripted/bulk imports:
 # Get a copy of your data -> Connections)
 python manage.py import_contacts --partner bill --source linkedin --file connections.csv
 
+# A partner's own Facebook friends export (Settings -> Your Facebook
+# Information -> Download Your Information -> select "Friends and
+# Followers" -> format: JSON). Facebook's export only includes names,
+# not emails/phones, which is fine -- matching works on name/company.
+python manage.py import_contacts --partner mendel --source facebook --file friends.json
+
 # A phone or email address book export (Google Contacts, Apple, Outlook, ...)
 python manage.py import_contacts --partner mendel --source phone --file phone_contacts.csv
 python manage.py import_contacts --partner shmulie --source email --file email_contacts.csv
@@ -74,6 +81,21 @@ python manage.py run_matching
 Sample files with the expected columns are in `sample_data/`. Column
 names are matched loosely (e.g. "Email", "E-mail", and "Email Address"
 all work), so exports from most tools should import without edits.
+
+### 1st-degree vs. 2nd-degree contacts
+
+A **1st-degree** contact is someone in a bulk export of your own direct
+connections/friends (LinkedIn connections.csv, a Facebook friends export,
+your phone or email contacts). A **2nd-degree** contact is someone you
+know through a mutual connection — this isn't a LinkedIn-specific idea:
+LinkedIn, Facebook, and other platforms all show you a "mutual
+friends/connections" indicator on people you're not yet connected to, and
+any of them work the same way here. There's no bulk-export for "all my
+mutual connections with everyone," so 2nd-degree entries are typically
+added one at a time via **Add a contact**, tagged 2nd-degree, after you've
+checked that indicator yourself on whichever platform shows it for that
+person. Same rule as everywhere else in this app: only your own view of
+your own network, never someone else's account.
 
 ## Reviewing matches
 

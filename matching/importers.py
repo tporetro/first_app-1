@@ -1,13 +1,14 @@
-"""CSV parsing helpers for self-exported contact and target lists.
+"""CSV/JSON parsing helpers for self-exported contact and target lists.
 
 Every importer here reads data a partner already legitimately holds
-(their own LinkedIn/phone/email export) or a target list the business
-already sources from public records. Column names vary a lot between
-export tools, so each parser matches loosely on header names rather than
-requiring an exact format.
+(their own LinkedIn/Facebook/phone/email export) or a target list the
+business already sources from public records. Column names vary a lot
+between export tools, so each parser matches loosely on header names
+rather than requiring an exact format.
 """
 import csv
 import io
+import json
 
 
 def _normalize(header):
@@ -71,6 +72,64 @@ def parse_linkedin_export(file_obj):
             "company": record.get(col_company, "").strip() if col_company else "",
             "phone": "",
             "raw_data": record,
+        })
+    return results
+
+
+def _fix_facebook_mojibake(value):
+    """Facebook's JSON export encodes non-ASCII text incorrectly: UTF-8
+    bytes get escaped as if they were Latin-1. Re-decoding fixes names
+    with accents/emoji; left as-is if that round-trip isn't possible
+    (already-correct exports from some newer tools)."""
+    if not value:
+        return value
+    try:
+        return value.encode("latin1").decode("utf8")
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return value
+
+
+def parse_facebook_export(file_obj):
+    """Parse a Facebook 'Download Your Information' friends export.
+
+    Facebook's own export (Settings -> Your Facebook Information ->
+    Download Your Information -> Friends and Followers -> JSON) produces
+    a friends_and_followers/friends.json file shaped like
+    {"friends_v2": [{"name": "...", "timestamp": ...}, ...]}. Facebook
+    does not include friends' emails/phones in this export (only your
+    own account's contact info is yours to export) -- name-only records
+    are expected and are still useful for name-based matching.
+    """
+    raw = file_obj.read()
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        raise ValueError("Could not parse this as a Facebook friends export (expected JSON).")
+
+    friends = data.get("friends_v2")
+    if friends is None and isinstance(data.get("friends"), dict):
+        friends = data["friends"].get("friends_v2")
+    if friends is None:
+        raise ValueError(
+            "Could not find a 'friends_v2' list in this file. Make sure you selected "
+            "'Friends and Followers' in JSON format from Facebook's Download Your Information tool."
+        )
+
+    results = []
+    for entry in friends:
+        if not isinstance(entry, dict):
+            continue
+        full_name = _fix_facebook_mojibake(entry.get("name", "")).strip()
+        if not full_name:
+            continue
+        results.append({
+            "full_name": full_name,
+            "email": "",
+            "phone": "",
+            "company": "",
+            "raw_data": entry,
         })
     return results
 

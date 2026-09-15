@@ -7,7 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase
 
-from matching.importers import parse_generic_contacts, parse_linkedin_export, parse_targets
+from matching.importers import parse_facebook_export, parse_generic_contacts, parse_linkedin_export, parse_targets
 from matching.models import Contact, ContactImport, Match, PropertyFinding, PropertyResearchRun, Target, TargetImport
 from matching.services import normalize
 from matching import research
@@ -35,6 +35,17 @@ TARGETS_CSV = (
     "Unrelated Stranger,,456 Oak Ave,Lakewood,NJ,08701,hail,2026-06-02,storm batch 4\n"
 )
 
+# "JosÃ©" is what Facebook's mojibake'd export contains on disk for the
+# name "José" -- the correct UTF-8 bytes for "é" (0xC3 0xA9), misread as
+# two separate Latin-1 characters. This is the real, documented shape of
+# Facebook's own export bug, not a synthetic edge case.
+FACEBOOK_FRIENDS_JSON = json.dumps({
+    "friends_v2": [
+        {"name": "Jane Doe", "timestamp": 1600000000},
+        {"name": "JosÃ© GarcÃ­a", "timestamp": 1600000001},
+    ]
+})
+
 
 class ImporterTests(TestCase):
     def test_parse_linkedin_export_skips_notes_preamble(self):
@@ -57,6 +68,28 @@ class ImporterTests(TestCase):
         self.assertEqual(records[0]["owner_name"], "Shmuel Weiner")
         self.assertEqual(records[0]["entity_name"], "Weiner Realty LLC")
         self.assertEqual(records[0]["state"], "NY")
+
+    def test_parse_facebook_export_fixes_mojibake_and_has_no_contact_info(self):
+        records = parse_facebook_export(io.BytesIO(FACEBOOK_FRIENDS_JSON.encode()))
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[0]["full_name"], "Jane Doe")
+        self.assertEqual(records[1]["full_name"], "José García")
+        self.assertEqual(records[0]["email"], "")
+        self.assertEqual(records[0]["phone"], "")
+
+    def test_parse_facebook_export_handles_nested_friends_key(self):
+        nested = json.dumps({"friends": {"friends_v2": [{"name": "Jane Doe"}]}})
+        records = parse_facebook_export(io.BytesIO(nested.encode()))
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["full_name"], "Jane Doe")
+
+    def test_parse_facebook_export_rejects_non_json(self):
+        with self.assertRaises(ValueError):
+            parse_facebook_export(io.BytesIO(b"not json"))
+
+    def test_parse_facebook_export_rejects_missing_friends_key(self):
+        with self.assertRaises(ValueError):
+            parse_facebook_export(io.BytesIO(json.dumps({"unrelated": []}).encode()))
 
 
 class NormalizeTests(TestCase):

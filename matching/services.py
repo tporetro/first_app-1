@@ -9,11 +9,12 @@ from django.conf import settings
 from django.db import transaction
 from rapidfuzz import fuzz
 
-from .importers import parse_generic_contacts, parse_linkedin_export, parse_targets
+from .importers import parse_facebook_export, parse_generic_contacts, parse_linkedin_export, parse_targets
 from .models import Contact, ContactImport, Match, Target, TargetImport
 
 CONTACT_PARSERS = {
     ContactImport.SourceType.LINKEDIN: parse_linkedin_export,
+    ContactImport.SourceType.FACEBOOK: parse_facebook_export,
     ContactImport.SourceType.PHONE: parse_generic_contacts,
     ContactImport.SourceType.EMAIL: parse_generic_contacts,
     ContactImport.SourceType.OTHER: parse_generic_contacts,

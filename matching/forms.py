@@ -9,9 +9,9 @@ class ContactImportForm(forms.Form):
         choices=Contact.Degree.choices,
         initial=Contact.Degree.FIRST,
         label="Degree",
-        help_text="1st-degree = your direct contacts. 2nd-degree = a mutual-connections export.",
+        help_text="1st-degree = your direct contacts/friends. 2nd-degree = a mutual-connections export.",
     )
-    file = forms.FileField(label="CSV file")
+    file = forms.FileField(label="File (CSV, or JSON for Facebook)")
 
 
 class TargetImportForm(forms.Form):
@@ -27,7 +27,11 @@ class SingleContactForm(forms.Form):
         choices=Contact.Degree.choices,
         initial=Contact.Degree.FIRST,
         label="Degree",
-        help_text="1st-degree = someone you know directly. 2nd-degree = someone you know through a mutual connection.",
+        help_text=(
+            "1st-degree = someone you know directly. 2nd-degree = someone you know "
+            "through a mutual connection you've verified yourself (LinkedIn, Facebook, "
+            "or any platform's own \"mutual friends/connections\" display on your account)."
+        ),
     )
 
     def clean(self):

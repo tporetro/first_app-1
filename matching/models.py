@@ -7,6 +7,7 @@ class ContactImport(models.Model):
 
     class SourceType(models.TextChoices):
         LINKEDIN = "linkedin", "LinkedIn export"
+        FACEBOOK = "facebook", "Facebook friends export"
         PHONE = "phone", "Phone contacts export"
         EMAIL = "email", "Email address book export"
         OTHER = "other", "Other"
