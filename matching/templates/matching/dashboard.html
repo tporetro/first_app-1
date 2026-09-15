@@ -1,5 +1,10 @@
 {% extends "matching/base.html" %}
 {% block content %}
+{% if messages %}
+<ul class="messages">
+    {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
+</ul>
+{% endif %}
 <form class="searchbar" method="get">
     <input type="text" name="q" placeholder="Search owner name..." value="{{ query }}">
     <button type="submit">Search</button>

@@ -1,18 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
 
-from matching.importers import parse_generic_contacts, parse_linkedin_export
 from matching.models import Contact, ContactImport
+from matching.services import ImportError_, import_contacts_from_file
 
 User = get_user_model()
-
-PARSERS = {
-    ContactImport.SourceType.LINKEDIN: parse_linkedin_export,
-    ContactImport.SourceType.PHONE: parse_generic_contacts,
-    ContactImport.SourceType.EMAIL: parse_generic_contacts,
-    ContactImport.SourceType.OTHER: parse_generic_contacts,
-}
 
 
 class Command(BaseCommand):
@@ -43,42 +35,24 @@ class Command(BaseCommand):
         except User.DoesNotExist:
             raise CommandError(f"No user found with username '{options['partner']}'")
 
-        source = options["source"]
-        parser_fn = PARSERS[source]
-
         try:
             with open(options["file"], "rb") as f:
-                records = parser_fn(f)
+                batch, count = import_contacts_from_file(
+                    partner=partner,
+                    source_type=options["source"],
+                    file_obj=f,
+                    degree=options["degree"],
+                    file_name=options["file"].split("/")[-1],
+                )
         except FileNotFoundError:
             raise CommandError(f"File not found: {options['file']}")
-        except ValueError as e:
+        except ImportError_ as e:
             raise CommandError(str(e))
 
-        if not records:
+        if count == 0:
             self.stdout.write(self.style.WARNING("No rows parsed from file; nothing imported."))
             return
 
-        with transaction.atomic():
-            batch = ContactImport.objects.create(
-                partner=partner,
-                source_type=source,
-                file_name=options["file"].split("/")[-1],
-                row_count=len(records),
-            )
-            Contact.objects.bulk_create([
-                Contact(
-                    partner=partner,
-                    import_batch=batch,
-                    full_name=r["full_name"],
-                    email=r.get("email", ""),
-                    phone=r.get("phone", ""),
-                    company=r.get("company", ""),
-                    degree=options["degree"],
-                    raw_data=r.get("raw_data", {}),
-                )
-                for r in records
-            ])
-
         self.stdout.write(self.style.SUCCESS(
-            f"Imported {len(records)} contact(s) for {partner.username} from {options['file']}"
+            f"Imported {count} contact(s) for {partner.username} from {options['file']}"
         ))

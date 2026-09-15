@@ -18,6 +18,14 @@
         .searchbar input { padding: 0.4rem; width: 260px; }
         .pagination { margin-top: 1rem; }
         .pagination a { margin-right: 0.5rem; }
+        nav { margin-bottom: 1rem; }
+        nav a { margin-right: 1rem; }
+        .messages { list-style: none; padding: 0; }
+        .messages li { padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; border-radius: 4px; }
+        .messages .success { background: #e3f7e9; color: #0a7a2f; }
+        .messages .warning { background: #fff6e0; color: #a06a00; }
+        .messages .error { background: #fde8e8; color: #b00020; }
+        form.upload-form p { margin: 0.5rem 0; }
     </style>
 </head>
 <body>
@@ -34,6 +42,17 @@
             {% endif %}
         </div>
     </header>
+    {% if user.is_authenticated %}
+    <nav>
+        <a href="{% url 'dashboard' %}">Dashboard</a>
+        <a href="{% url 'import_contacts' %}">Import my contacts</a>
+        <a href="{% url 'import_targets' %}">Import target list</a>
+        <form action="{% url 'run_matching' %}" method="post" style="display:inline">
+            {% csrf_token %}
+            <button type="submit">Run matching</button>
+        </form>
+    </nav>
+    {% endif %}
     {% block content %}{% endblock %}
 </body>
 </html>

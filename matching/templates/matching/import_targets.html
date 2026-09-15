@@ -1,0 +1,17 @@
+{% extends "matching/base.html" %}
+{% block content %}
+<h2>Import target list</h2>
+<p>Upload the commercial building-owner / hail-damage lead list.</p>
+
+{% if messages %}
+<ul class="messages">
+    {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Upload</button>
+</form>
+{% endblock %}

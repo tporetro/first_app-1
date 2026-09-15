@@ -1,0 +1,18 @@
+{% extends "matching/base.html" %}
+{% block content %}
+<h2>Import my contacts</h2>
+<p>Upload your own LinkedIn connections export, phone contacts export, or email address book export.
+Only you will see these contacts unless a match is found and confirmed.</p>
+
+{% if messages %}
+<ul class="messages">
+    {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Upload</button>
+</form>
+{% endblock %}

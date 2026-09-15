@@ -1,12 +1,13 @@
 import io
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase
 
 from matching.importers import parse_generic_contacts, parse_linkedin_export, parse_targets
-from matching.management.commands.run_matching import normalize
 from matching.models import Contact, ContactImport, Match, Target, TargetImport
+from matching.services import normalize
 
 User = get_user_model()
 
@@ -147,3 +148,73 @@ class DashboardViewTests(TestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Some Owner")
+
+
+class ContactImportViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="shmulie", password="x")
+        self.client.force_login(self.user)
+
+    def test_requires_login(self):
+        self.client.logout()
+        response = self.client.get("/import/contacts/")
+        self.assertEqual(response.status_code, 302)
+
+    def test_uploads_linkedin_csv_and_creates_contacts(self):
+        upload = SimpleUploadedFile("connections.csv", LINKEDIN_CSV.encode(), content_type="text/csv")
+        response = self.client.post("/import/contacts/", {
+            "source_type": ContactImport.SourceType.LINKEDIN,
+            "degree": Contact.Degree.FIRST,
+            "file": upload,
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Contact.objects.filter(partner=self.user).count(), 2)
+        self.assertContains(response, "Imported 2 contact(s)")
+
+    def test_bad_linkedin_csv_shows_error_without_crashing(self):
+        upload = SimpleUploadedFile("bad.csv", b"not,a,linkedin,export\n1,2,3,4\n", content_type="text/csv")
+        response = self.client.post("/import/contacts/", {
+            "source_type": ContactImport.SourceType.LINKEDIN,
+            "degree": Contact.Degree.FIRST,
+            "file": upload,
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Contact.objects.count(), 0)
+        self.assertContains(response, "Could not import")
+
+
+class TargetImportViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="mendel2", password="x")
+        self.client.force_login(self.user)
+
+    def test_uploads_targets_csv(self):
+        upload = SimpleUploadedFile("targets.csv", TARGETS_CSV.encode(), content_type="text/csv")
+        response = self.client.post("/import/targets/", {"file": upload}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Target.objects.count(), 2)
+        self.assertContains(response, "Imported 2 target(s)")
+
+
+class RunMatchingViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="bill2", password="x")
+        self.client.force_login(self.user)
+        contact_import = ContactImport.objects.create(
+            partner=self.user, source_type=ContactImport.SourceType.LINKEDIN, row_count=1
+        )
+        Contact.objects.create(
+            partner=self.user, import_batch=contact_import, full_name="Shmuel Weiner", company="Weiner Realty LLC"
+        )
+        target_import = TargetImport.objects.create(row_count=1)
+        Target.objects.create(import_batch=target_import, owner_name="Shmuel Weiner", entity_name="Weiner Realty LLC")
+
+    def test_get_not_allowed(self):
+        response = self.client.get("/run-matching/")
+        self.assertEqual(response.status_code, 405)
+
+    def test_post_creates_matches_and_redirects_to_dashboard(self):
+        response = self.client.post("/run-matching/", follow=True)
+        self.assertRedirects(response, "/")
+        self.assertEqual(Match.objects.count(), 1)
+        self.assertContains(response, "new candidate match")

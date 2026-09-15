@@ -31,13 +31,23 @@ python manage.py createsuperuser   # create a login for each partner
 python manage.py runserver
 ```
 
-Visit `http://127.0.0.1:8000/admin/` to import data and review matches, or
-`http://127.0.0.1:8000/` for the read-only ranked dashboard.
+Visit `http://127.0.0.1:8000/` and log in to reach:
+
+- **Dashboard** (`/`) — ranked list of targets with their best known path
+- **Import my contacts** (`/import/contacts/`) — upload your own LinkedIn/phone/email export as the logged-in partner
+- **Import target list** (`/import/targets/`) — upload the building-owner/hail-damage CSV
+- **Run matching** button — recompute candidate matches after new imports
+- **Admin / Review Queue** (`/admin/`) — confirm or reject candidate matches, browse raw data
 
 Create one login per partner (`createsuperuser`, or via the admin's Users
-page) so each partner's imported contacts stay attributed to them.
+page) so each partner's imported contacts stay attributed to them and
+private to them until a match is confirmed.
 
 ## Importing data
+
+The easiest path is the web UI above: log in as a partner, go to **Import
+my contacts**, pick the source type, and upload the CSV. The same logic
+is also available from the command line, e.g. for scripted/bulk imports:
 
 ```bash
 # A partner's own LinkedIn connections export (Settings & Privacy ->
