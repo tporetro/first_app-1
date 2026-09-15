@@ -7,7 +7,15 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase
 
-from matching.importers import parse_facebook_export, parse_generic_contacts, parse_linkedin_export, parse_targets
+from matching.importers import (
+    _parse_note_business_listing,
+    _unescape_vcard_value,
+    _unfold_vcard_lines,
+    parse_facebook_export,
+    parse_generic_contacts,
+    parse_linkedin_export,
+    parse_targets,
+)
 from matching.models import Contact, ContactImport, Match, PropertyFinding, PropertyResearchRun, Target, TargetImport
 from matching.services import normalize
 from matching import research
@@ -27,6 +35,50 @@ GOOGLE_CONTACTS_CSV = (
     "Name,Given Name,Family Name,E-mail 1 - Value,Phone 1 - Value,Organization 1 - Name\n"
     "Moshe Katz,Moshe,Katz,moshe@example.com,555-1234,Katz Properties\n"
     ",Rivka,Stern,,555-5678,\n"
+)
+
+# A business-listing NOTE, matching the real format seen in an actual
+# Google Contacts vCard export: the real name/phone are embedded as
+# "Key: Value" lines (vCard-escaped) inside NOTE, with FN left as the
+# placeholder "Unknown". The property line below is deliberately folded
+# mid-value (a continuation line starting with a single space) to
+# exercise real vCard line-folding, since ~46% of lines in the real file
+# turned out to be folded continuations.
+_BUSINESS_NOTE_VALUE = (
+    "Latitude: 30.435674\\n"
+    "Name: GG's Construction\\, LLC\\n"
+    "Address1: 13608 Bullick Hollow Road\\n"
+    "City: Austin\\n"
+    "State: TX\\n"
+    "Zip: 78726\\n"
+    "Phone1: +1 512-630-8775\\n"
+)
+_note_line = f"NOTE:{_BUSINESS_NOTE_VALUE}"
+_split_at = len(_note_line) // 2
+_folded_note_line = _note_line[:_split_at] + "\r\n " + _note_line[_split_at:]
+
+VCARD_TEXT = (
+    "BEGIN:VCARD\r\n"
+    "VERSION:3.0\r\n"
+    "N:;Unknown;;;\r\n"
+    "FN:Unknown\r\n"
+    f"{_folded_note_line}\r\n"
+    "END:VCARD\r\n"
+    "BEGIN:VCARD\r\n"
+    "VERSION:3.0\r\n"
+    "N:Schell;Kirk;;;\r\n"
+    "FN:Kirk Schell\r\n"
+    "TEL;type=HOME;type=VOICE;type=pref:+15551234567\r\n"
+    "EMAIL;type=INTERNET;type=pref:kirk@example.com\r\n"
+    "ORG:Example Realty LLC;\r\n"
+    "PHOTO;ENCODING=b:AAAA\r\n"
+    " BBBB\r\n"
+    " CCCC\r\n"
+    "END:VCARD\r\n"
+    "BEGIN:VCARD\r\n"
+    "FN:\r\n"
+    "N:;;;;\r\n"
+    "END:VCARD\r\n"
 )
 
 TARGETS_CSV = (
@@ -61,6 +113,40 @@ class ImporterTests(TestCase):
         self.assertEqual(records[0]["full_name"], "Moshe Katz")
         self.assertEqual(records[0]["company"], "Katz Properties")
         self.assertEqual(records[1]["full_name"], "Rivka Stern")
+
+    def test_parse_generic_contacts_detects_and_parses_vcard(self):
+        records = parse_generic_contacts(io.BytesIO(VCARD_TEXT.encode()))
+        # 3 vCards in the fixture; the one with no usable name is dropped
+        self.assertEqual(len(records), 2)
+
+    def test_vcard_extracts_business_listing_embedded_in_note(self):
+        records = parse_generic_contacts(io.BytesIO(VCARD_TEXT.encode()))
+        biz = records[0]
+        self.assertEqual(biz["full_name"], "GG's Construction, LLC")
+        self.assertEqual(biz["phone"], "+1 512-630-8775")
+
+    def test_vcard_parses_standard_contact_fields_despite_folded_photo(self):
+        records = parse_generic_contacts(io.BytesIO(VCARD_TEXT.encode()))
+        person = records[1]
+        self.assertEqual(person["full_name"], "Kirk Schell")
+        self.assertEqual(person["phone"], "+15551234567")
+        self.assertEqual(person["email"], "kirk@example.com")
+        self.assertEqual(person["company"], "Example Realty LLC")
+        # PHOTO's base64 blob must not leak into raw_data
+        self.assertNotIn("PHOTO", person["raw_data"])
+
+    def test_unescape_vcard_value(self):
+        self.assertEqual(_unescape_vcard_value("a\\, b\\; c\\\\d\\ne"), "a, b; c\\d\ne")
+
+    def test_unfold_vcard_lines_joins_continuations_and_strips_cr(self):
+        text = "BEGIN:VCARD\r\nNOTE:abc\r\n def\r\nEND:VCARD"
+        lines = _unfold_vcard_lines(text)
+        self.assertEqual(lines, ["BEGIN:VCARD", "NOTE:abcdef", "END:VCARD"])
+
+    def test_parse_note_business_listing(self):
+        fields = _parse_note_business_listing("Name: Acme Roofing\nPhone1: 555-1234\nCity: Austin")
+        self.assertEqual(fields["name"], "Acme Roofing")
+        self.assertEqual(fields["phone1"], "555-1234")
 
     def test_parse_targets(self):
         records = parse_targets(io.BytesIO(TARGETS_CSV.encode()))

@@ -136,8 +136,18 @@ def parse_facebook_export(file_obj):
 
 
 def parse_generic_contacts(file_obj):
-    """Parse a generic phone/email address-book CSV export (Google, Apple, Outlook, ...)."""
-    rows = _read_rows(file_obj)
+    """Parse a generic phone/email address-book export (Google, Apple,
+    Outlook, ...). Auto-detects a vCard (.vcf) export vs. a CSV export
+    from the content itself, not the filename, since export tools don't
+    always name files predictably.
+    """
+    raw = file_obj.read()
+    text = raw.decode("utf-8-sig", errors="replace") if isinstance(raw, bytes) else raw
+
+    if text.lstrip().upper().startswith("BEGIN:VCARD"):
+        return parse_vcard_contacts(text)
+
+    rows = list(csv.reader(io.StringIO(text)))
     if not rows:
         return []
     headers = rows[0]
@@ -168,6 +178,109 @@ def parse_generic_contacts(file_obj):
             "company": record.get(col_company, "").strip() if col_company else "",
             "raw_data": record,
         })
+    return results
+
+
+def _unescape_vcard_value(value):
+    """Un-escapes vCard TEXT value escaping (RFC 6350: \\n, \\,, \\;, \\\\)."""
+    out = []
+    i = 0
+    while i < len(value):
+        if value[i] == "\\" and i + 1 < len(value):
+            nxt = value[i + 1]
+            out.append("\n" if nxt in "nN" else nxt)
+            i += 2
+        else:
+            out.append(value[i])
+            i += 1
+    return "".join(out)
+
+
+def _unfold_vcard_lines(text):
+    """Joins vCard line-folding continuations (a line starting with a
+    space or tab is a continuation of the previous line) and strips
+    trailing \\r from CRLF line endings."""
+    lines = []
+    for raw_line in text.replace("\r\n", "\n").split("\n"):
+        line = raw_line.rstrip("\r")
+        if line.startswith(" ") or line.startswith("\t"):
+            if lines:
+                lines[-1] += line[1:]
+            continue
+        lines.append(line)
+    return lines
+
+
+def _parse_note_business_listing(note_text):
+    """Some exports embed a structured business listing (name, phone,
+    address, ...) as plain "Key: Value" lines inside the NOTE field,
+    with FN left as a placeholder like "Unknown". Extracts that."""
+    fields = {}
+    for line in note_text.split("\n"):
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        fields[key.strip().lower()] = value.strip()
+    return fields
+
+
+def _vcard_props_to_record(props):
+    fn = props.get("FN", [""])[0].strip()
+    org = props.get("ORG", [""])[0].split(";")[0].strip()
+    phone = props.get("TEL", [""])[0].strip()
+    email = props.get("EMAIL", [""])[0].strip()
+    note = "\n".join(props.get("NOTE", []))
+
+    full_name = fn
+    if (not full_name or full_name.lower() == "unknown") and note:
+        note_fields = _parse_note_business_listing(note)
+        full_name = note_fields.get("name", full_name)
+        phone = phone or note_fields.get("phone1", "")
+        email = email or note_fields.get("email1", "")
+
+    full_name = full_name.strip()
+    if not full_name or full_name.lower() == "unknown":
+        return None
+
+    return {
+        "full_name": full_name,
+        "email": email,
+        "phone": phone,
+        "company": org,
+        "raw_data": props,
+    }
+
+
+def parse_vcard_contacts(text):
+    """Parses a vCard (.vcf) export into the same record shape as the
+    other contact parsers. PHOTO fields are dropped immediately (huge
+    base64 blobs, irrelevant to matching) but line-unfolding still
+    happens first so a folded PHOTO value doesn't get misread as new
+    vCard properties.
+    """
+    lines = _unfold_vcard_lines(text)
+
+    results = []
+    current = None
+    for line in lines:
+        stripped = line.strip()
+        if stripped.upper() == "BEGIN:VCARD":
+            current = {}
+            continue
+        if stripped.upper() == "END:VCARD":
+            if current is not None:
+                record = _vcard_props_to_record(current)
+                if record:
+                    results.append(record)
+            current = None
+            continue
+        if current is None or ":" not in line:
+            continue
+        prop, _, value = line.partition(":")
+        prop_name = prop.split(";", 1)[0].strip().upper()
+        if prop_name == "PHOTO":
+            continue
+        current.setdefault(prop_name, []).append(_unescape_vcard_value(value))
     return results
 
 
