@@ -73,6 +73,43 @@ def import_contacts_from_file(partner, source_type, file_obj, degree, file_name=
     return batch, len(records)
 
 
+def create_manual_contacts(partner, contacts_data, degree, source_type=ContactImport.SourceType.PHONE, file_name="Manual entry"):
+    """Creates one or more contacts a partner entered/picked directly,
+    rather than importing from a file. Used by the manual add-a-contact
+    form and the browser Contact Picker flow -- both are still the
+    partner adding their own contacts, so they share the same batch-based
+    provenance as file imports.
+
+    contacts_data: iterable of dicts with at least "full_name", plus any
+    of "email", "phone", "company".
+    """
+    records = [r for r in contacts_data if r.get("full_name", "").strip()]
+    if not records:
+        return None, 0
+
+    with transaction.atomic():
+        batch = ContactImport.objects.create(
+            partner=partner,
+            source_type=source_type,
+            file_name=file_name,
+            row_count=len(records),
+        )
+        Contact.objects.bulk_create([
+            Contact(
+                partner=partner,
+                import_batch=batch,
+                full_name=r["full_name"].strip(),
+                email=r.get("email", "") or "",
+                phone=r.get("phone", "") or "",
+                company=r.get("company", "") or "",
+                degree=degree,
+                raw_data=r.get("raw_data", {}),
+            )
+            for r in records
+        ])
+    return batch, len(records)
+
+
 def import_targets_from_file(file_obj, file_name=""):
     from datetime import datetime
 

@@ -46,6 +46,7 @@
     <nav>
         <a href="{% url 'dashboard' %}">Dashboard</a>
         <a href="{% url 'import_contacts' %}">Import my contacts</a>
+        <a href="{% url 'add_contact' %}">Add a contact</a>
         <a href="{% url 'import_targets' %}">Import target list</a>
         <form action="{% url 'run_matching' %}" method="post" style="display:inline">
             {% csrf_token %}

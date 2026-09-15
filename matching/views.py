@@ -1,16 +1,25 @@
+import json
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Prefetch
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, FormView, ListView
 
-from .forms import ContactImportForm, TargetImportForm
-from .models import Match, PropertyResearchRun, Target
+from .forms import ContactImportForm, SingleContactForm, TargetImportForm
+from .models import Contact, Match, PropertyResearchRun, Target
 from .research import ResearchUnavailable, run_research
-from .services import ImportError_, import_contacts_from_file, import_targets_from_file, run_matching
+from .services import (
+    ImportError_,
+    create_manual_contacts,
+    import_contacts_from_file,
+    import_targets_from_file,
+    run_matching,
+)
 
 
 class DashboardView(LoginRequiredMixin, ListView):
@@ -89,6 +98,67 @@ class TargetImportView(LoginRequiredMixin, FormView):
         else:
             messages.success(self.request, f"Imported {count} target(s) from '{upload.name}'.")
         return super().form_valid(form)
+
+
+class AddContactView(LoginRequiredMixin, FormView):
+    """Manual quick-add for a single contact, plus (where the browser
+    supports it) a "pick from phone contacts" button using the Contact
+    Picker API -- see the bulk endpoint below for that path."""
+
+    template_name = "matching/add_contact.html"
+    form_class = SingleContactForm
+    success_url = reverse_lazy("add_contact")
+
+    def form_valid(self, form):
+        data = form.cleaned_data
+        batch, count = create_manual_contacts(
+            partner=self.request.user,
+            contacts_data=[{
+                "full_name": data["full_name"],
+                "phone": data["phone"],
+                "email": data["email"],
+                "company": data["company"],
+            }],
+            degree=data["degree"],
+            file_name="Manual entry",
+        )
+        if count:
+            messages.success(self.request, f"Added {data['full_name']} to your contacts.")
+        return super().form_valid(form)
+
+
+class BulkAddContactsView(LoginRequiredMixin, View):
+    """POST-only JSON endpoint for the browser Contact Picker flow: the
+    page's JS asks the OS for permission, the user picks contacts on
+    their own device, and the picked list is posted here as JSON."""
+
+    def post(self, request, *args, **kwargs):
+        try:
+            payload = json.loads(request.body)
+            contacts = payload.get("contacts", [])
+        except (json.JSONDecodeError, AttributeError):
+            return JsonResponse({"error": "Invalid request body."}, status=400)
+
+        if not isinstance(contacts, list):
+            return JsonResponse({"error": "'contacts' must be a list."}, status=400)
+
+        records = []
+        for c in contacts:
+            if not isinstance(c, dict):
+                continue
+            records.append({
+                "full_name": (c.get("full_name") or "").strip(),
+                "phone": (c.get("phone") or "").strip(),
+                "email": (c.get("email") or "").strip(),
+            })
+
+        batch, count = create_manual_contacts(
+            partner=request.user,
+            contacts_data=records,
+            degree=Contact.Degree.FIRST,
+            file_name="Phone contact picker",
+        )
+        return JsonResponse({"added": count})
 
 
 class RunMatchingView(LoginRequiredMixin, View):

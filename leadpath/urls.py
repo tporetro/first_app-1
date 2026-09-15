@@ -3,6 +3,8 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 
 from matching.views import (
+    AddContactView,
+    BulkAddContactsView,
     ContactImportView,
     DashboardView,
     RunMatchingView,
@@ -18,6 +20,8 @@ urlpatterns = [
     path("", DashboardView.as_view(), name="dashboard"),
     path("import/contacts/", ContactImportView.as_view(), name="import_contacts"),
     path("import/targets/", TargetImportView.as_view(), name="import_targets"),
+    path("contacts/add/", AddContactView.as_view(), name="add_contact"),
+    path("contacts/add/bulk/", BulkAddContactsView.as_view(), name="bulk_add_contacts"),
     path("run-matching/", RunMatchingView.as_view(), name="run_matching"),
     path("targets/<int:pk>/", TargetDetailView.as_view(), name="target_detail"),
     path("targets/<int:pk>/run-research/", RunResearchView.as_view(), name="run_research"),

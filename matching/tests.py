@@ -473,3 +473,122 @@ class TargetDetailViewTests(TestCase):
         response = self.client.get(f"/targets/{self.target.pk}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Roof storm damage")
+
+
+class CreateManualContactsTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="partner1", password="x")
+
+    def test_creates_contact_tied_to_partner(self):
+        from matching.services import create_manual_contacts
+
+        batch, count = create_manual_contacts(
+            partner=self.user,
+            contacts_data=[{"full_name": "Jane Doe", "phone": "555-1234", "email": ""}],
+            degree=Contact.Degree.FIRST,
+        )
+        self.assertEqual(count, 1)
+        contact = Contact.objects.get(partner=self.user)
+        self.assertEqual(contact.full_name, "Jane Doe")
+        self.assertEqual(contact.phone, "555-1234")
+        self.assertEqual(contact.import_batch, batch)
+
+    def test_skips_records_without_a_name(self):
+        from matching.services import create_manual_contacts
+
+        batch, count = create_manual_contacts(
+            partner=self.user,
+            contacts_data=[{"full_name": "", "phone": "555-1234"}, {"full_name": "  ", "email": "a@b.com"}],
+            degree=Contact.Degree.FIRST,
+        )
+        self.assertEqual(count, 0)
+        self.assertIsNone(batch)
+        self.assertEqual(Contact.objects.count(), 0)
+
+    def test_bulk_creates_multiple_contacts_in_one_batch(self):
+        from matching.services import create_manual_contacts
+
+        batch, count = create_manual_contacts(
+            partner=self.user,
+            contacts_data=[
+                {"full_name": "Jane Doe", "phone": "555-1234"},
+                {"full_name": "John Smith", "email": "john@example.com"},
+            ],
+            degree=Contact.Degree.FIRST,
+            file_name="Phone contact picker",
+        )
+        self.assertEqual(count, 2)
+        self.assertEqual(Contact.objects.filter(import_batch=batch).count(), 2)
+        self.assertEqual(batch.file_name, "Phone contact picker")
+
+
+class AddContactViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="partner2", password="x")
+        self.client.force_login(self.user)
+
+    def test_requires_login(self):
+        self.client.logout()
+        response = self.client.get("/contacts/add/")
+        self.assertEqual(response.status_code, 302)
+
+    def test_creates_contact_with_valid_data(self):
+        response = self.client.post("/contacts/add/", {
+            "full_name": "Jane Doe",
+            "phone": "555-1234",
+            "email": "",
+            "company": "Doe Realty",
+            "degree": Contact.Degree.FIRST,
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+        contact = Contact.objects.get(partner=self.user)
+        self.assertEqual(contact.full_name, "Jane Doe")
+        self.assertEqual(contact.company, "Doe Realty")
+        self.assertContains(response, "Added Jane Doe")
+
+    def test_rejects_contact_without_phone_or_email(self):
+        response = self.client.post("/contacts/add/", {
+            "full_name": "Jane Doe",
+            "phone": "",
+            "email": "",
+            "company": "",
+            "degree": Contact.Degree.FIRST,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Contact.objects.count(), 0)
+        self.assertContains(response, "Enter at least a phone number or an email address")
+
+
+class BulkAddContactsViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="partner3", password="x")
+        self.client.force_login(self.user)
+
+    def test_requires_login(self):
+        self.client.logout()
+        response = self.client.post("/contacts/add/bulk/", data="{}", content_type="application/json")
+        self.assertEqual(response.status_code, 302)
+
+    def test_creates_contacts_from_picker_payload(self):
+        payload = {"contacts": [
+            {"full_name": "Jane Doe", "phone": "555-1234", "email": ""},
+            {"full_name": "John Smith", "phone": "", "email": "john@example.com"},
+        ]}
+        response = self.client.post("/contacts/add/bulk/", data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"added": 2})
+        self.assertEqual(Contact.objects.filter(partner=self.user).count(), 2)
+
+    def test_filters_out_entries_without_a_name(self):
+        payload = {"contacts": [{"full_name": "", "phone": "555-1234"}]}
+        response = self.client.post("/contacts/add/bulk/", data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(response.json(), {"added": 0})
+        self.assertEqual(Contact.objects.count(), 0)
+
+    def test_invalid_json_returns_400_not_500(self):
+        response = self.client.post("/contacts/add/bulk/", data="not json", content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+
+    def test_non_list_contacts_returns_400(self):
+        response = self.client.post("/contacts/add/bulk/", data=json.dumps({"contacts": "oops"}), content_type="application/json")
+        self.assertEqual(response.status_code, 400)

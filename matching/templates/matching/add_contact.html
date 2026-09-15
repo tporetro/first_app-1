@@ -1,0 +1,71 @@
+{% extends "matching/base.html" %}
+{% block content %}
+<h2>Add a contact</h2>
+<p>Add someone from your own phone contacts, one at a time or (on supported
+browsers, mainly Android Chrome) picked straight from your phone's contact
+list. This is your own contact data, private to you until a match is confirmed.</p>
+
+{% if messages %}
+<ul class="messages">
+    {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<div id="picker-section" style="display:none; margin-bottom: 1.5rem; padding: 1rem; background: #fff; border-radius: 6px;">
+    <p>Your browser supports picking contacts directly from your phone.</p>
+    <button type="button" id="pick-contacts-btn">Pick from phone contacts</button>
+    <div id="picker-status" style="margin-top: 0.5rem;"></div>
+</div>
+
+<h3>Or add one by hand</h3>
+<form method="post" class="upload-form">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Add contact</button>
+</form>
+
+<script>
+(function () {
+    if (!('contacts' in navigator && 'ContactsManager' in window)) {
+        return;
+    }
+    document.getElementById('picker-section').style.display = 'block';
+
+    document.getElementById('pick-contacts-btn').addEventListener('click', async function () {
+        const statusEl = document.getElementById('picker-status');
+        try {
+            const props = ['name', 'email', 'tel'];
+            const picked = await navigator.contacts.select(props, { multiple: true });
+            if (!picked.length) {
+                statusEl.textContent = 'No contacts selected.';
+                return;
+            }
+            const contacts = picked.map(function (p) {
+                return {
+                    full_name: (p.name && p.name[0]) || '',
+                    email: (p.email && p.email[0]) || '',
+                    phone: (p.tel && p.tel[0]) || '',
+                };
+            }).filter(function (c) { return c.full_name; });
+
+            statusEl.textContent = 'Adding ' + contacts.length + ' contact(s)...';
+            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const resp = await fetch('{% url "bulk_add_contacts" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ contacts: contacts }),
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                statusEl.textContent = 'Added ' + data.added + ' contact(s). Reloading...';
+                setTimeout(function () { window.location.reload(); }, 800);
+            } else {
+                statusEl.textContent = 'Error: ' + (data.error || 'could not add contacts.');
+            }
+        } catch (err) {
+            statusEl.textContent = 'Could not access contacts: ' + err.message;
+        }
+    });
+})();
+</script>
+{% endblock %}

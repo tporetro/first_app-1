@@ -35,6 +35,10 @@ Visit `http://127.0.0.1:8000/` and log in to reach:
 
 - **Dashboard** (`/`) — ranked list of targets with their best known path
 - **Import my contacts** (`/import/contacts/`) — upload your own LinkedIn/phone/email export as the logged-in partner
+- **Add a contact** (`/contacts/add/`) — add one contact by hand, or on
+  supported browsers (mainly Android Chrome/Edge — not iOS Safari or
+  desktop) pick straight from your phone's contact list via the browser's
+  Contact Picker, no export/upload step needed
 - **Import target list** (`/import/targets/`) — upload the building-owner/hail-damage CSV
 - **Run matching** button — recompute candidate matches after new imports
 - **Target detail page** (`/targets/<id>/`) — connection paths plus a "Run research" button for property/entity findings
