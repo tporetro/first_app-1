@@ -37,6 +37,7 @@ Visit `http://127.0.0.1:8000/` and log in to reach:
 - **Import my contacts** (`/import/contacts/`) — upload your own LinkedIn/phone/email export as the logged-in partner
 - **Import target list** (`/import/targets/`) — upload the building-owner/hail-damage CSV
 - **Run matching** button — recompute candidate matches after new imports
+- **Target detail page** (`/targets/<id>/`) — connection paths plus a "Run research" button for property/entity findings
 - **Admin / Review Queue** (`/admin/`) — confirm or reject candidate matches, browse raw data
 
 Create one login per partner (`createsuperuser`, or via the admin's Users
@@ -76,6 +77,45 @@ Candidate matches sit in `Pending review` status until a partner confirms
 them in the admin (`Matching > Matches`, select rows, use the "Confirm" /
 "Reject" actions). Only confirmed matches represent a connection you've
 actually verified is real before anyone acts on it.
+
+## Property/entity research
+
+From a target's detail page, "Run research" scans public sources for
+facts about **the building and the business entity that owns it** —
+tenant/public complaints (e.g. a Reddit thread about roof leaks), permits
+and code violations, storm/damage reports, and entity-level business news
+or litigation. Findings are shown with their source link so you can
+verify them yourself before acting on them.
+
+This is deliberately scoped to the property and the business entity, not
+the owner as a private individual: it will not surface and does not
+search for personal life events, health information, family matters, or
+personal (as opposed to corporate) philanthropy. That's enforced in both
+the search queries and the prompt sent to the analysis model, not left to
+its judgment.
+
+Requires two API keys, set as environment variables:
+
+- `ANTHROPIC_API_KEY` — required. Used to turn raw search snippets into
+  structured, sourced findings. Without it, "Run research" fails cleanly
+  with a message telling you it isn't configured.
+- `BING_SEARCH_API_KEY` — optional. Adds general web search (news,
+  permit filings, etc.) alongside Reddit. Without it, only Reddit is
+  searched.
+
+Reddit search additionally benefits from (but doesn't require) a free
+Reddit API app for reliability, since Reddit's public search endpoint is
+often blocked from cloud/data-center IPs:
+
+- Create a "script" app at <https://www.reddit.com/prefs/apps>
+- Set `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` from it
+- Optionally set `REDDIT_USER_AGENT` to something identifying (Reddit's
+  API terms require a descriptive user agent, e.g. `"leadpath/1.0 by
+  yourusername"`)
+
+Without Reddit credentials, the app falls back to Reddit's public,
+unauthenticated search, which works but may be rate-limited or blocked
+depending on your hosting network.
 
 ## Notes on scope
 

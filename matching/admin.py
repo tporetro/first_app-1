@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import Contact, ContactImport, Match, Target, TargetImport
+from .models import Contact, ContactImport, Match, PropertyFinding, PropertyResearchRun, Target, TargetImport
 
 
 @admin.register(ContactImport)
@@ -57,12 +57,27 @@ class MatchInline(admin.TabularInline):
         return False
 
 
+class PropertyFindingInline(admin.TabularInline):
+    model = PropertyFinding
+    extra = 0
+    fields = ("finding_type", "summary", "relevance_score", "source_name", "source_url")
+    readonly_fields = ("finding_type", "summary", "relevance_score", "source_name", "source_url")
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Target)
 class TargetAdmin(admin.ModelAdmin):
-    list_display = ("owner_name", "entity_name", "city", "state", "damage_date", "match_status")
+    list_display = ("owner_name", "entity_name", "city", "state", "damage_date", "match_status", "finding_count")
     list_filter = ("state", "damage_type")
     search_fields = ("owner_name", "entity_name", "address", "city")
-    inlines = [MatchInline]
+    inlines = [MatchInline, PropertyFindingInline]
+
+    @admin.display(description="Findings")
+    def finding_count(self, obj):
+        return obj.findings.count()
 
     @admin.display(description="Best match")
     def match_status(self, obj):
@@ -98,3 +113,18 @@ class MatchAdmin(admin.ModelAdmin):
     def reject_matches(self, request, queryset):
         updated = queryset.update(status=Match.Status.REJECTED, reviewed_by=request.user, reviewed_at=timezone.now())
         self.message_user(request, f"Rejected {updated} match(es).")
+
+
+@admin.register(PropertyResearchRun)
+class PropertyResearchRunAdmin(admin.ModelAdmin):
+    list_display = ("target", "status", "requested_by", "created_at", "finished_at")
+    list_filter = ("status",)
+    readonly_fields = ("target", "requested_by", "status", "error_message", "created_at", "finished_at")
+
+
+@admin.register(PropertyFinding)
+class PropertyFindingAdmin(admin.ModelAdmin):
+    list_display = ("target", "finding_type", "summary", "relevance_score", "source_name", "created_at")
+    list_filter = ("finding_type",)
+    search_fields = ("target__owner_name", "summary")
+    readonly_fields = ("target", "research_run", "finding_type", "summary", "source_url", "source_name", "relevance_score", "created_at")

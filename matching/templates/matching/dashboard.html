@@ -18,6 +18,7 @@
             <th>City / State</th>
             <th>Damage date</th>
             <th>Best path</th>
+            <th></th>
         </tr>
     </thead>
     <tbody>
@@ -40,9 +41,10 @@
                     <span class="status-none">No known path</span>
                 {% endif %}
             </td>
+            <td><a href="{% url 'target_detail' row.target.pk %}">Details / research</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="5">No targets imported yet.</td></tr>
+        <tr><td colspan="6">No targets imported yet.</td></tr>
         {% endfor %}
     </tbody>
 </table>

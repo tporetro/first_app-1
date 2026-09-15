@@ -1,0 +1,71 @@
+{% extends "matching/base.html" %}
+{% block content %}
+{% if messages %}
+<ul class="messages">
+    {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<p><a href="{% url 'dashboard' %}">&laquo; Back to dashboard</a></p>
+
+<h2>{{ target.owner_name }}</h2>
+<p>
+    {{ target.entity_name }}<br>
+    {{ target.address }} {{ target.city }}{% if target.city and target.state %}, {% endif %}{{ target.state }} {{ target.zip_code }}<br>
+    Damage: {{ target.damage_type }}{% if target.damage_date %} on {{ target.damage_date }}{% endif %}
+</p>
+
+<h3>Connection paths</h3>
+<table>
+    <thead><tr><th>Partner</th><th>Contact</th><th>Confidence</th><th>Status</th></tr></thead>
+    <tbody>
+        {% for m in matches %}
+        <tr>
+            <td>{{ m.contact.partner.username }}</td>
+            <td>{{ m.contact.full_name }}</td>
+            <td>{{ m.match_confidence|floatformat:0 }}%</td>
+            <td class="status-{{ m.status }}">{{ m.get_status_display }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No known path yet.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3>Property / entity research</h3>
+<p>
+    Public-source findings about the building and its owning business entity
+    only &mdash; roof/building condition, tenant complaints, permits, and
+    entity-level news or litigation. Personal information about the owner as
+    an individual is out of scope and is never collected here.
+</p>
+<form action="{% url 'run_research' target.pk %}" method="post">
+    {% csrf_token %}
+    <button type="submit">Run research</button>
+</form>
+
+<table>
+    <thead><tr><th>Type</th><th>Summary</th><th>Relevance</th><th>Source</th></tr></thead>
+    <tbody>
+        {% for finding in findings %}
+        <tr>
+            <td>{{ finding.get_finding_type_display }}</td>
+            <td>{{ finding.summary }}</td>
+            <td>{{ finding.relevance_score|floatformat:0 }}%</td>
+            <td>{% if finding.source_url %}<a href="{{ finding.source_url }}" target="_blank" rel="noopener">{{ finding.source_name|default:"source" }}</a>{% else %}{{ finding.source_name }}{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No research findings yet.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if research_runs %}
+<h4>Recent research runs</h4>
+<ul>
+    {% for run in research_runs %}
+    <li>{{ run.created_at }} &mdash; {{ run.get_status_display }}{% if run.error_message %}: {{ run.error_message }}{% endif %}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

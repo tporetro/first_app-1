@@ -2,7 +2,14 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
-from matching.views import ContactImportView, DashboardView, RunMatchingView, TargetImportView
+from matching.views import (
+    ContactImportView,
+    DashboardView,
+    RunMatchingView,
+    RunResearchView,
+    TargetDetailView,
+    TargetImportView,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -12,4 +19,6 @@ urlpatterns = [
     path("import/contacts/", ContactImportView.as_view(), name="import_contacts"),
     path("import/targets/", TargetImportView.as_view(), name="import_targets"),
     path("run-matching/", RunMatchingView.as_view(), name="run_matching"),
+    path("targets/<int:pk>/", TargetDetailView.as_view(), name="target_detail"),
+    path("targets/<int:pk>/run-research/", RunResearchView.as_view(), name="run_research"),
 ]

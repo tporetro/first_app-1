@@ -137,3 +137,64 @@ class Match(models.Model):
 
     def __str__(self):
         return f"{self.target} <-> {self.contact} ({self.match_confidence:.0f}%)"
+
+
+class PropertyResearchRun(models.Model):
+    """One research pass over public sources for a target's property/entity."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        RUNNING = "running", "Running"
+        DONE = "done", "Done"
+        FAILED = "failed", "Failed"
+
+    target = models.ForeignKey(Target, on_delete=models.CASCADE, related_name="research_runs")
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Research run for {self.target} ({self.status})"
+
+
+class PropertyFinding(models.Model):
+    """A single fact surfaced about a target's building or business entity.
+
+    Scope is deliberately limited to the property and the business entity
+    that owns it -- roof/building condition, tenant complaints, permits,
+    code violations, litigation, and entity-level business news. This is
+    never used to store personal/biographical facts about the owner as an
+    individual (life events, health, personal philanthropy, family
+    matters): those are out of scope by design, not just by omission.
+    """
+
+    class FindingType(models.TextChoices):
+        COMPLAINT = "complaint", "Tenant/public complaint"
+        PERMIT = "permit", "Building permit or code violation"
+        DAMAGE = "damage", "Reported damage or storm event"
+        NEWS = "news", "Business/entity news"
+        LITIGATION = "litigation", "Litigation or regulatory action"
+        OTHER = "other", "Other property/entity fact"
+
+    target = models.ForeignKey(Target, on_delete=models.CASCADE, related_name="findings")
+    research_run = models.ForeignKey(
+        PropertyResearchRun, on_delete=models.CASCADE, related_name="findings", null=True, blank=True
+    )
+    finding_type = models.CharField(max_length=20, choices=FindingType.choices, default=FindingType.OTHER)
+    summary = models.TextField(help_text="Factual, property/entity-level summary of what was found")
+    source_url = models.URLField(blank=True)
+    source_name = models.CharField(max_length=255, blank=True)
+    published_at = models.DateField(null=True, blank=True)
+    relevance_score = models.FloatField(default=0.0, help_text="0-100, how relevant this is to a hail-damage claim")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-relevance_score", "-created_at"]
+
+    def __str__(self):
+        return f"{self.get_finding_type_display()}: {self.summary[:60]}"

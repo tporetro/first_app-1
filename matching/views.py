@@ -1,13 +1,15 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Prefetch
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
+from django.utils import timezone
 from django.views import View
-from django.views.generic import FormView, ListView
+from django.views.generic import DetailView, FormView, ListView
 
 from .forms import ContactImportForm, TargetImportForm
-from .models import Match, Target
+from .models import Match, PropertyResearchRun, Target
+from .research import ResearchUnavailable, run_research
 from .services import ImportError_, import_contacts_from_file, import_targets_from_file, run_matching
 
 
@@ -99,3 +101,63 @@ class RunMatchingView(LoginRequiredMixin, View):
         else:
             messages.success(request, f"Checked {checked} pair(s); found {created} new candidate match(es).")
         return redirect("dashboard")
+
+
+class TargetDetailView(LoginRequiredMixin, DetailView):
+    model = Target
+    template_name = "matching/target_detail.html"
+    context_object_name = "target"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["findings"] = self.object.findings.all()
+        context["matches"] = self.object.matches.select_related("contact", "contact__partner").all()
+        context["research_runs"] = self.object.research_runs.all()[:5]
+        return context
+
+
+class RunResearchView(LoginRequiredMixin, View):
+    """POST-only trigger to run public-source property/entity research
+    for one target. Scoped to the building and its owning business
+    entity -- see matching/research.py for what is and isn't collected."""
+
+    def post(self, request, *args, **kwargs):
+        target = get_object_or_404(Target, pk=kwargs["pk"])
+        run = PropertyResearchRun.objects.create(
+            target=target, requested_by=request.user, status=PropertyResearchRun.Status.RUNNING
+        )
+        try:
+            findings = run_research(target)
+        except ResearchUnavailable as e:
+            run.status = PropertyResearchRun.Status.FAILED
+            run.error_message = str(e)
+            run.finished_at = timezone.now()
+            run.save()
+            messages.error(request, f"Research isn't configured yet: {e}")
+            return redirect("target_detail", pk=target.pk)
+        except Exception as e:
+            run.status = PropertyResearchRun.Status.FAILED
+            run.error_message = str(e)
+            run.finished_at = timezone.now()
+            run.save()
+            messages.error(request, f"Research failed: {e}")
+            return redirect("target_detail", pk=target.pk)
+
+        for f in findings:
+            run.findings.create(
+                target=target,
+                finding_type=f["finding_type"],
+                summary=f["summary"],
+                relevance_score=f["relevance_score"],
+                source_url=f.get("source_url", ""),
+                source_name=f.get("source_name", ""),
+            )
+        run.status = PropertyResearchRun.Status.DONE
+        run.finished_at = timezone.now()
+        run.save()
+
+        if findings:
+            messages.success(request, f"Found {len(findings)} finding(s) about the property/entity.")
+        else:
+            messages.info(request, "No relevant property/entity findings surfaced in this pass.")
+        return redirect("target_detail", pk=target.pk)
