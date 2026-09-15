@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Log in - Lead Path</title>
+    <style>
+        body { font-family: -apple-system, Helvetica, Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fafafa; }
+        form { background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        input { display: block; width: 240px; margin-bottom: 0.75rem; padding: 0.4rem; }
+        .errorlist { color: #b00020; }
+    </style>
+</head>
+<body>
+    <form method="post">
+        {% csrf_token %}
+        <h2>Lead Path</h2>
+        {{ form.errors }}
+        {{ form.as_p }}
+        <button type="submit">Log in</button>
+    </form>
+</body>
+</html>

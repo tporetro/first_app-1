@@ -1,0 +1,50 @@
+{% extends "matching/base.html" %}
+{% block content %}
+<form class="searchbar" method="get">
+    <input type="text" name="q" placeholder="Search owner name..." value="{{ query }}">
+    <button type="submit">Search</button>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>Owner</th>
+            <th>Entity</th>
+            <th>City / State</th>
+            <th>Damage date</th>
+            <th>Best path</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            <td>{{ row.target.owner_name }}</td>
+            <td>{{ row.target.entity_name }}</td>
+            <td>{{ row.target.city }}{% if row.target.city and row.target.state %}, {% endif %}{{ row.target.state }}</td>
+            <td>{{ row.target.damage_date|default:"—" }}</td>
+            <td>
+                {% if row.best_match %}
+                    <span class="status-{{ row.best_match.status }}">
+                        {{ row.best_match.get_status_display }}
+                    </span>
+                    via <strong>{{ row.best_match.contact.partner.username }}</strong>
+                    &rarr; {{ row.best_match.contact.full_name }}
+                    ({{ row.best_match.match_confidence|floatformat:0 }}%)
+                    {% if row.match_count > 1 %}<em>+{{ row.match_count|add:"-1" }} more</em>{% endif %}
+                {% else %}
+                    <span class="status-none">No known path</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5">No targets imported yet.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="pagination">
+    {% if page_obj.has_previous %}<a href="?q={{ query }}&page={{ page_obj.previous_page_number }}">&laquo; Prev</a>{% endif %}
+    {% if page_obj %}<span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>{% endif %}
+    {% if page_obj.has_next %}<a href="?q={{ query }}&page={{ page_obj.next_page_number }}">Next &raquo;</a>{% endif %}
+</div>
+{% endblock %}

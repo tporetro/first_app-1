@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}Lead Path{% endblock %}</title>
+    <style>
+        body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 2rem; color: #1a1a1a; background: #fafafa; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        h1 { font-size: 1.4rem; margin: 0; }
+        table { border-collapse: collapse; width: 100%; background: #fff; }
+        th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e5e5e5; font-size: 0.92rem; }
+        th { background: #f0f0f0; }
+        .status-confirmed { color: #0a7a2f; font-weight: 600; }
+        .status-pending { color: #a06a00; }
+        .status-rejected { color: #999; }
+        .status-none { color: #999; }
+        .searchbar { margin-bottom: 1rem; }
+        .searchbar input { padding: 0.4rem; width: 260px; }
+        .pagination { margin-top: 1rem; }
+        .pagination a { margin-right: 0.5rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Lead Path Dashboard</h1>
+        <div>
+            {% if user.is_authenticated %}
+                {{ user.username }} &middot;
+                <a href="/admin/">Admin / Review Queue</a> &middot;
+                <form action="{% url 'logout' %}" method="post" style="display:inline">
+                    {% csrf_token %}
+                    <button type="submit">Log out</button>
+                </form>
+            {% endif %}
+        </div>
+    </header>
+    {% block content %}{% endblock %}
+</body>
+</html>
