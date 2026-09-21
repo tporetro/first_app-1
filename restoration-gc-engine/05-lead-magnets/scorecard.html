@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roof-Claim Readiness Scorecard | Restoration GC</title>
+<style>body{font-family:system-ui,Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#111}
+h1{font-size:1.5rem}.q{margin:14px 0}label{display:block;margin:6px 0}
+button{background:#0b5;color:#fff;border:0;padding:12px 18px;border-radius:8px;font-size:1rem;cursor:pointer}
+.disc{font-size:.8rem;color:#555;margin-top:16px;border-top:1px solid #ddd;padding-top:12px}
+input[type=text],input[type=email]{width:100%;padding:10px;margin:4px 0;border:1px solid #ccc;border-radius:6px}</style></head>
+<body>
+<h1>Commercial Roof-Claim Readiness Scorecard</h1>
+<p>Educational self-assessment. We document damage and scope — we do not adjust claims or give legal advice.</p>
+<form id="f">
+ <div class="q"><label><input type="checkbox" name="a" value="10"> I have dated photos of my roof before the storm</label>
+ <label><input type="checkbox" name="a" value="10"> I know my date of loss</label>
+ <label><input type="checkbox" name="a" value="10"> I have my full policy & declarations page</label>
+ <label><input type="checkbox" name="a" value="10"> I have not yet missed my state notice deadline</label></div>
+ <input type="text" name="full_name" placeholder="Full name" required>
+ <input type="email" name="email" placeholder="Work email" required>
+ <input type="text" name="company" placeholder="Company / property">
+ <select name="state" required><option value="">State</option><option>TX</option><option>IL</option><option>FL</option><option>OK</option><option value="OTHER">Other</option></select>
+ <label><input type="checkbox" id="ec" required> I agree Restoration GC may email me educational information. I can unsubscribe anytime. (Restoration GC, 701 Brazos St, Austin, TX 78701)</label>
+ <label><input type="checkbox" id="vc"> I agree Restoration GC may call/text me, <b>including with an AI-generated voice</b>, at the number I provide, using automated technology. Consent is not a condition of purchase. Msg/data rates may apply.</label>
+ <input type="text" name="phone" placeholder="Phone (only if you check the box above)">
+ <button type="submit">Get my score</button>
+</form>
+<div class="disc" id="disc">Restoration GC is a licensed general contractor, not a public insurance adjuster; we do not adjust claims or provide legal advice.</div>
+<script>
+const HS_PORTAL="__HS_PORTAL_ID__",HS_FORM="__HS_FORM_GUID__",SB_URL="__SUPABASE_URL__",SB_ANON="__SUPABASE_ANON_KEY__";
+const disc={TX:"Texas law requires you to pay your deductible (Tex. Ins. Code §707.002). We cannot waive or absorb it.",FL:"In Florida, notice of a new/reopened claim is generally barred after 1 year from date of loss (§627.70132).",OK:"Oklahoma law (59 O.S. §1151.30): a roofing contractor may not pay any part of your deductible.",IL:"Illinois law (215 ILCS 5/155.51) prohibits waiving or inflating deductibles.",OTHER:""};
+function utm(k){return new URLSearchParams(location.search).get(k)||"";}
+document.getElementById('f').addEventListener('submit',async e=>{e.preventDefault();
+ const fd=new FormData(e.target),score=[...document.querySelectorAll('[name=a]:checked')].reduce((s,c)=>s+ +c.value,0);
+ const st=fd.get('state');document.getElementById('disc').textContent+=" "+(disc[st]||"");
+ const email=fd.get('email'),phone=fd.get('phone'),ec=document.getElementById('ec').checked,vc=document.getElementById('vc').checked;
+ // HubSpot Forms v3
+ await fetch(`https://api.hsforms.com/submissions/v3/integration/submit/${HS_PORTAL}/${HS_FORM}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   fields:[{name:'email',value:email},{name:'firstname',value:fd.get('full_name')},{name:'company',value:fd.get('company')||''},{name:'phone',value:phone||''},{name:'rgc_primary_state',value:st},{name:'rgc_lead_magnet',value:'scorecard'},{name:'rgc_total_score',value:String(score)}],
+   context:{pageUri:location.href,pageName:'Scorecard'},
+   legalConsentOptions:{consent:{consentToProcess:true,text:'I agree to allow Restoration GC to store and process my data.',communications:[{value:ec,subscriptionTypeId:__EMAIL_SUB_ID__,text:'Email educational information'}]}}})});
+ // Supabase capture (submission + consent rows)
+ const h={'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+SB_ANON};
+ await fetch(SB_URL+'/rest/v1/lead_magnet_submissions',{method:'POST',headers:h,body:JSON.stringify({magnet_slug:'scorecard',email,full_name:fd.get('full_name'),phone,company:fd.get('company'),state:st,answers:{score},utm_source:utm('utm_source'),utm_medium:utm('utm_medium'),utm_campaign:utm('utm_campaign'),utm_content:utm('utm_content'),source_url:location.href})});
+ await fetch(SB_URL+'/rest/v1/consent_records',{method:'POST',headers:h,body:JSON.stringify([{email,phone,channel:'email',consent_given:ec,consent_text:'Email educational info',source_url:location.href},{email,phone,channel:'voice',consent_given:vc,ai_voice_disclosed:vc,consent_text:'AI-voice/automated call+text consent',source_url:location.href}])});
+ e.target.innerHTML=`<h2>Your readiness score: ${score}/40</h2><p>We'll email your personalized checklist. ${disc[st]||''}</p>`;});
+</script></body></html>

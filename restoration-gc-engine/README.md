@@ -1,0 +1,91 @@
+# Restoration GC — Unified LinkedIn Management + Commercial Building-Owner Lead-Gen & Education Engine
+
+Build package for Michael Johnson ("MJ") / Restoration GC: a compliance-verified educational marketing and lead-generation system for commercial building owners affected by storm damage, built on Supabase + HubSpot + n8n + FastAPI + LinkedIn's Community Management API.
+
+**Core principle: "educate, never adjust."** Every layer of this system — the compliance lexicon, the agent prompts, the lead magnets, the outreach templates — enforces no outcome guarantees, no deductible inducements, no legal advice, state-scoped disclaimers, and human approval of every LinkedIn send and every consent-gated voice/email dispatch.
+
+## File Tree
+
+```
+restoration-gc-engine/
+├── README.md
+├── 01-supabase/            SQL migration: 10 tables, PostGIS, RLS, triggers, compliance seed
+├── 02-hubspot/             Custom properties, lead-scoring model, workflows, attribution dashboard
+├── 03-n8n/                 W1 (importable JSON) + W2–W7 specs + FastAPI webhook contract
+├── 04-agents/              6 agent system prompts (shared guardrail block + role-specific)
+├── 05-lead-magnets/        5 single-file HTML lead-magnet pages
+├── 06-linkedin/            Community Management API application, profile/company rewrite,
+│                           Lead Gen Form spec, outreach templates
+├── 07-content/             30-day evergreen content calendar + storm-response pack
+├── 08-testing/             Test plan, 44-prompt compliance red-team suite, fixtures
+└── 09-docs/                Risk register
+```
+
+> Note: the source blueprint's file tree lists `W1..W7.json`. Only W1 is a fully importable n8n workflow JSON in this build; W2–W7 are delivered as node-by-node specs (`.md`) using the same n8n node vocabulary, to be assembled and pinned to your installed node `typeVersion`s in your n8n instance (see `03-n8n/` for details).
+
+## Architecture
+
+```mermaid
+flowchart LR
+  FA[FastAPI api.restorationgc.net] -->|HMAC webhook| W1[n8n W1]
+  LM[Lead-magnet HTML] --> HS[(HubSpot)]
+  LM --> SB[(Supabase)]
+  W1 --> SB
+  W2[W2] --> HS & SB
+  W3[W3 evergreen] --> CG[Compliance-Gate Agent] --> SB
+  SB --> W6[W6 digest] --> GM[Gmail → MJ one-tap]
+  MJ((MJ approves)) --> W4[W4 dispatch]
+  W4 -->|consent verified| RT[Retell voice] & GM
+  SB <--> W5[W5] <--> HS
+  LI[LinkedIn API] --> SB
+  W7[W7 KPI] --> GM
+```
+
+## Deployment Order
+
+1. **Supabase:** run `01-supabase/001_init.sql` through `007_verify.sql` in order in the SQL editor; confirm PostGIS + RLS via `007_verify.sql`.
+2. **HubSpot:** create the `restorationgc` property group; `POST` each entry in `02-hubspot/custom_properties.json`; build the 4 workflows in `02-hubspot/workflows.md`; note the `subscriptionTypeId`s you create for use in the lead-magnet pages.
+3. **n8n:** create all named credentials (see `03-n8n/fastapi_webhook_contract.md`); import W1; build W2–W7 from their specs; set webhook URLs; **keep W4 disabled.**
+4. **Lead magnets:** host the 5 pages in `05-lead-magnets/` (e.g., on rgchub.com); replace the `__HS_PORTAL_ID__`, `__HS_FORM_GUID__`, `__SUPABASE_URL__`, `__SUPABASE_ANON_KEY__`, and `__EMAIL_SUB_ID__` placeholders.
+5. **FastAPI:** add the 3 endpoints in `03-n8n/fastapi_webhook_contract.md` with HMAC verification.
+6. **LinkedIn:** file the Community Management API application (`06-linkedin/community_api_application.md`); publish the profile/Company Page rewrite (`06-linkedin/profile_rewrite.md`).
+7. **Content:** load the 30-day calendar (`07-content/30_day_evergreen.md`) into `content_drafts`.
+8. **Counsel review:** have counsel review the compliance lexicon (`01-supabase/006_seed.sql`) and all disclaimers before the first live send.
+9. **Enable W4:** only after MJ signs off on the Retell consent flow and a clean red-team run (`08-testing/compliance_redteam.md` — 0 `block`-severity items marked `pass`).
+
+## Env / Credential Checklist
+
+`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_ANON_KEY`, `HUBSPOT_PRIVATE_APP_TOKEN`, `HS_PORTAL_ID`, `HS_FORM_GUID` (×5, one per lead magnet), `EMAIL_SUB_ID`, `OPENAI_API_KEY`, `RETELL_API_KEY`, `FASTAPI_HMAC_SECRET`, `LINKEDIN_CLIENT_ID`/`LINKEDIN_CLIENT_SECRET`, `GMAIL_OAUTH`.
+
+## Requires MJ's Own Credentials / Approval
+
+- LinkedIn Community Management API application (business email verification + Page super-admin verification)
+- HubSpot / Supabase / n8n admin access
+- Retell consent-flow sign-off before W4 is enabled
+- **Counsel review of all educational content and the compliance lexicon before first send**
+- DocuSign for any contracts (must include the TX §27.02(b) notice — see `01-supabase/006_seed.sql` rule `tx_contract_notice`)
+
+## Monitoring
+
+- n8n execution-error alerts routed to Gmail.
+- Supabase log drain.
+- Weekly consent-rate + compliance-flag review via W7 (`03-n8n/W7_weekly_kpi_report.md`).
+- **Token refresh:** LinkedIn/HubSpot OAuth auto-refresh via n8n credentials; LinkedIn webhook re-validates every 2 hours (must respond `200` JSON within 3 seconds, or 3 consecutive failures blocks it).
+- **Rollback:** every SQL migration is idempotent (`if not exists` / `do $$ ... exception when duplicate_object`); n8n workflows are versioned via export; disabling W4 halts all outbound instantly.
+
+## Recommendations (Staged)
+
+1. **Now:** run the Supabase migration; file the LinkedIn Community Management API application (longest lead time); send the lexicon to counsel. *Threshold to proceed:* PostGIS + RLS verified; counsel sign-off received.
+2. **Week 1:** deploy HubSpot properties/workflows, lead magnets, W1–W3 and W5–W7 (leave W4 off). *Threshold:* W1 dry-run passes with the hail fixture (`08-testing/fixtures/hail_event.json`); consent rows write correctly.
+3. **Week 2:** after Retell consent-flow sign-off and a clean red-team run, enable W4. *Threshold to expand IL activity:* confirm no paid PA-referral model exists (IL DOI Bulletin 2026-02) — if any partner arrangement involves "anything of value" for PA lead-gen, do not launch it in IL.
+4. **Ongoing:** weekly W7 review; if the compliance-flag rate exceeds 5% of drafts or the consent rate drops below 40%, pause the affected channel and re-tune the Content/Compliance agents.
+
+## Caveats / Unverified Items
+
+- **IL Bulletin 2026-02 does not itself cite 215 ILCS 5/155.51 / PA 098-0862** — those are separate deductible-fraud statutes, kept as distinct lexicon rules (the Bulletin anchors on Article XLV: §§1510, 1515, 1610).
+- **FCC July 2024 AI-disclosure NPRM (CG Docket 23-362) is proposed, not final** — this build already includes an AI-voice disclosure as best practice; monitor for a final rule that may add specific consent/disclosure mandates.
+- **HubSpot's "v3" form-submission endpoint is the legacy `integration/submit` path** — there is no newer supported alternative as of this build.
+- **HubSpot lead-scoring UI varies by tier/edition** — `02-hubspot/lead_scoring_model.md` expresses the model as portable point rules on custom number properties so it works regardless of which native scoring UI your HubSpot tier exposes; verify at deploy time.
+- **W1 is a fully importable n8n workflow JSON; W2–W7 are node-by-node specs**, not raw importable JSON — assemble and pin to your installed n8n node `typeVersion`s.
+- **TX Ch. 542A interest rate (currently ~13.5%) floats** with Finance Code §304.003 + 5% — re-check the current published rate at deploy time.
+- The `ok_no_deductible` pattern rule in `01-supabase/006_seed.sql` was added to this build (not explicitly enumerated in the original blueprint's seed list) to close a gap: OK's own statute (59 O.S. §1151.30) prohibits deductible-inducement advertising the same way TX and IL statutes do, but the original seed only included an OK required-disclaimer rule, not a matching banned-phrase pattern.
