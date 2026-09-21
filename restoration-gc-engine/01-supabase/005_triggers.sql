@@ -1,7 +1,7 @@
 create or replace function public.set_updated_at() returns trigger as $$
 begin new.updated_at = now(); return new; end; $$ language plpgsql;
 do $$ declare t text; begin
-  foreach t in array array['storm_events','properties','owners','compliance_rules','content_drafts','approval_queue']
+  foreach t in array array['storm_events','portfolios','properties','owners','compliance_rules','content_drafts','approval_queue']
   loop execute format('drop trigger if exists trg_updated_%1$s on public.%1$I;', t);
     execute format('create trigger trg_updated_%1$s before update on public.%1$I for each row execute function public.set_updated_at();', t);
   end loop;

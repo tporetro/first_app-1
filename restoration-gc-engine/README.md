@@ -9,16 +9,16 @@ Build package for Michael Johnson ("MJ") / Restoration GC: a compliance-verified
 ```
 restoration-gc-engine/
 ├── README.md
-├── 01-supabase/            SQL migration: 10 tables, PostGIS, RLS, triggers, compliance seed
+├── 01-supabase/            SQL migration: 11 tables (incl. portfolios), PostGIS, RLS, triggers, compliance seed
 ├── 02-hubspot/             Custom properties, lead-scoring model, workflows, attribution dashboard
 ├── 03-n8n/                 W1 (importable JSON) + W2–W7 specs + FastAPI webhook contract
 ├── 04-agents/              6 agent system prompts (shared guardrail block + role-specific)
 ├── 05-lead-magnets/        5 single-file HTML lead-magnet pages
 ├── 06-linkedin/            Community Management API application, profile/company rewrite,
 │                           Lead Gen Form spec, outreach templates
-├── 07-content/             30-day evergreen content calendar + storm-response pack
+├── 07-content/             30-day evergreen content calendar, curriculum spine, storm-response pack
 ├── 08-testing/             Test plan, 44-prompt compliance red-team suite, fixtures
-└── 09-docs/                Risk register
+└── 09-docs/                Risk register, detailed state-law reference
 ```
 
 > Note: the source blueprint's file tree lists `W1..W7.json`. Only W1 is a fully importable n8n workflow JSON in this build; W2–W7 are delivered as node-by-node specs (`.md`) using the same n8n node vocabulary, to be assembled and pinned to your installed node `typeVersion`s in your n8n instance (see `03-n8n/` for details).
@@ -73,12 +73,22 @@ flowchart LR
 - **Token refresh:** LinkedIn/HubSpot OAuth auto-refresh via n8n credentials; LinkedIn webhook re-validates every 2 hours (must respond `200` JSON within 3 seconds, or 3 consecutive failures blocks it).
 - **Rollback:** every SQL migration is idempotent (`if not exists` / `do $$ ... exception when duplicate_object`); n8n workflows are versioned via export; disabling W4 halts all outbound instantly.
 
+## KPIs
+
+Full funnel chain (see `02-hubspot/attribution_dashboard.md` for the widget-level detail and the W-shaped attribution model): **impressions → engagement rate → lead-magnet conversion → MQL → SQL → booked inspection → signed claim → revenue.** Track alongside: Lead Gen Form conversion rate (benchmark ~13%), connection acceptance rate, spam-complaint rate (< 3%), briefing→assessment conversion (storm-response mode), and cost per booked inspection.
+
 ## Recommendations (Staged)
 
 1. **Now:** run the Supabase migration; file the LinkedIn Community Management API application (longest lead time); send the lexicon to counsel. *Threshold to proceed:* PostGIS + RLS verified; counsel sign-off received.
 2. **Week 1:** deploy HubSpot properties/workflows, lead magnets, W1–W3 and W5–W7 (leave W4 off). *Threshold:* W1 dry-run passes with the hail fixture (`08-testing/fixtures/hail_event.json`); consent rows write correctly.
 3. **Week 2:** after Retell consent-flow sign-off and a clean red-team run, enable W4. *Threshold to expand IL activity:* confirm no paid PA-referral model exists (IL DOI Bulletin 2026-02) — if any partner arrangement involves "anything of value" for PA lead-gen, do not launch it in IL.
 4. **Ongoing:** weekly W7 review; if the compliance-flag rate exceeds 5% of drafts or the consent rate drops below 40%, pause the affected channel and re-tune the Content/Compliance agents.
+
+### 30/90-Day Roadmap (mapped onto the staged plan above)
+
+- **Days 1–30:** schema + HubSpot properties + LinkedIn API app filed; 3 highest-intent lead magnets live (scorecard, deadline checker, underpaid diagnostic); daily approval queue running; evergreen calendar live; consent fields in place. Maps to Recommendations steps 1–2 above.
+- **Days 31–60:** storm-response mode live; owner-type nurture tracks (including the NN-lease roof-responsibility qualifying question); portfolio maps for REIT/asset-manager owners (`portfolios` table); Retell consent flow signed off. Maps to Recommendations step 3.
+- **Days 61–90:** attribution dashboard live with the W-shaped model; A/B testing across formats; inspection-partner handoff SLA; webinar engine for high-intent portfolio owners. Maps to Recommendations step 4 (ongoing).
 
 ## Caveats / Unverified Items
 
@@ -89,3 +99,4 @@ flowchart LR
 - **W1 is a fully importable n8n workflow JSON; W2–W7 are node-by-node specs**, not raw importable JSON — assemble and pin to your installed n8n node `typeVersion`s.
 - **TX Ch. 542A interest rate (currently ~13.5%) floats** with Finance Code §304.003 + 5% — re-check the current published rate at deploy time.
 - The `ok_no_deductible` pattern rule in `01-supabase/006_seed.sql` was added to this build (not explicitly enumerated in the original blueprint's seed list) to close a gap: OK's own statute (59 O.S. §1151.30) prohibits deductible-inducement advertising the same way TX and IL statutes do, but the original seed only included an OK required-disclaimer rule, not a matching banned-phrase pattern.
+- **This build was reconciled against a second, later strategy blueprint** covering the same system from a different angle (curriculum framing, LinkedIn-native lead-gen mechanics, a W-shaped attribution model, and richer state-law citations). Rather than duplicate structures, the genuinely new elements were folded in: the `portfolios` table (for REIT/asset-manager cross-property reporting), `content_drafts.asset_urls`, `attribution_events.campaign_id`, the `send_connection_request` approval-queue action, the W-shaped attribution model, `07-content/curriculum.md`, and `09-docs/state_law_reference.md`. Where the two blueprints described the same mechanism with different field names (e.g. `storm_events`/`compliance_rules` column naming), this build kept its existing, already-deployed schema rather than renaming columns, to avoid a breaking migration with no functional benefit.

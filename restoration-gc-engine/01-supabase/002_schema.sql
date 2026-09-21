@@ -13,6 +13,15 @@ create table if not exists public.storm_events (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- PORTFOLIOS (groups properties under a REIT/asset-manager/portfolio owner for cross-property reporting)
+create table if not exists public.portfolios (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  owner_id uuid,                    -- FK added below, after owners exists
+  hubspot_company_id text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 -- PROPERTIES (parcel geometry)
 create table if not exists public.properties (
   id uuid primary key default uuid_generate_v4(),
@@ -24,6 +33,7 @@ create table if not exists public.properties (
   centroid geometry(Point,4326),
   storm_event_id uuid references public.storm_events(id) on delete set null,
   hail_impact_score numeric(5,2),
+  portfolio_id uuid references public.portfolios(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -40,6 +50,10 @@ create table if not exists public.owners (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Now that owners exists, wire up the portfolios.owner_id FK deferred above
+do $$ begin
+  alter table public.portfolios add constraint fk_portfolios_owner foreign key (owner_id) references public.owners(id) on delete set null;
+  exception when duplicate_object then null; end $$;
 -- COMPLIANCE RULES
 create table if not exists public.compliance_rules (
   id uuid primary key default uuid_generate_v4(),
@@ -65,6 +79,7 @@ create table if not exists public.content_drafts (
   state_tags us_state[] default '{}',
   title text,
   body text not null,
+  asset_urls text[] default '{}',            -- rendered carousel PDFs, images, video links produced by the Content Repurposing Agent
   compliance_status draft_status not null default 'generated',
   compliance_report jsonb,
   storm_event_id uuid references public.storm_events(id) on delete set null,
@@ -75,7 +90,9 @@ create table if not exists public.content_drafts (
 create table if not exists public.approval_queue (
   id uuid primary key default uuid_generate_v4(),
   content_draft_id uuid not null references public.content_drafts(id) on delete cascade,
-  action text not null default 'publish',   -- publish | send_dm | send_email | dispatch_voice
+  action text not null default 'publish',   -- publish | send_dm | send_email | dispatch_voice | send_connection_request
+  -- 'send_connection_request' is never auto-dispatched (LinkedIn UA §8.2 bans automated connection sends);
+  -- approving it here just clears the item from MJ's queue for him to send manually in LinkedIn.
   assigned_to text default 'michael@restorationgc.net',
   decision text,                             -- approve | edit | reject | pending
   decision_ts timestamptz,
@@ -91,6 +108,7 @@ create table if not exists public.attribution_events (
   hubspot_contact_id text,
   event_name text not null,      -- form_submit | linkedin_click | email_open | voice_connect | meeting_booked | inspection_dispatched | won
   touch_channel text,            -- linkedin | email | voice | lead_magnet | referral
+  campaign_id text,               -- groups touches into a named campaign (e.g. a storm_event or evergreen series) for the W-shaped model
   utm_source text, utm_medium text, utm_campaign text, utm_content text,
   value_usd numeric(12,2),
   occurred_at timestamptz not null default now(),

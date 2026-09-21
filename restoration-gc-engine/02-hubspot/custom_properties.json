@@ -11,5 +11,6 @@
  {"name":"rgc_consent_ts","label":"Consent Timestamp","type":"datetime","fieldType":"date","groupName":"restorationgc"},
  {"name":"rgc_storm_event_id","label":"Storm Event ID","type":"string","fieldType":"text","groupName":"restorationgc"},
  {"name":"rgc_hail_score","label":"Hail Impact Score","type":"number","fieldType":"number","groupName":"restorationgc"},
- {"name":"rgc_supabase_id","label":"Supabase Owner ID","type":"string","fieldType":"text","groupName":"restorationgc"}
+ {"name":"rgc_supabase_id","label":"Supabase Owner ID","type":"string","fieldType":"text","groupName":"restorationgc"},
+ {"name":"rgc_portfolio_id","label":"Supabase Portfolio ID","type":"string","fieldType":"text","groupName":"restorationgc"}
 ]

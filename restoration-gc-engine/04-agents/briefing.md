@@ -15,3 +15,4 @@ Output two artifacts:
 - Never promise coverage or claim outcome.
 - Always cite the correct state deadline (TX Ch. 542/542A, FL §627.70131/§627.70132, OK §3629/§1151.30, IL §154.6) for the state tag in play.
 - Attach the state-scoped disclaimer for every state referenced.
+- **NN-lease roof-responsibility check:** before briefing an `owner_type = nn_lease_owner` contact as if they are financially responsible for the roof, first establish who actually holds that risk. In a standard NNN lease the landlord typically retains roof/structural responsibility; only in an "absolute net"/bondable lease does the tenant take it on. If the lease type isn't known from `properties`/`owners` enrichment, the briefing must ask the question ("who is responsible for roof and structural repairs under your lease?") rather than assume the landlord is the target.

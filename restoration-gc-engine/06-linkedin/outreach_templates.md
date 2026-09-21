@@ -6,7 +6,9 @@ Every send requires human approval per LinkedIn User Agreement §8.2. Daily huma
 > Hi {first}, I work with commercial portfolios on documenting storm/hail roof damage before it becomes an underpaid claim. Happy to share our free Roof-Claim Readiness Scorecard — no pitch. — Michael Johnson, 512-621-4201
 
 ## NN-Lease / Dollar-Store Landlord
-> Hi {first}, a lot of NN-lease owners find out about roof damage only when a tenant complains. I share a free readiness checklist that helps you document damage before your notice deadline passes. Interested? — Michael Johnson, 512-621-4201
+> Hi {first}, a lot of NN-lease owners find out about roof damage only when a tenant complains — and who's responsible for the fix depends on your lease structure. I share a free readiness checklist that helps you document damage before your notice deadline passes, whoever holds the roof risk. Interested? — Michael Johnson, 512-621-4201
+
+*Note: in a standard NNN lease the landlord typically retains roof/structural responsibility unless the lease is "absolute net"/bondable. Don't assume — the first qualifying question with any NN-lease owner should confirm who is financially responsible for roof repairs under their specific lease before framing the rest of the conversation.*
 
 ## Religious / Nonprofit
 > Hi {first}, many church and nonprofit boards aren't sure what to document after a hailstorm before filing a claim. I put together a free scorecard that walks through it in five minutes, no obligation. — Michael Johnson, 512-621-4201
