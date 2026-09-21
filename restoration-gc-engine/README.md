@@ -44,7 +44,7 @@ flowchart LR
 ## Deployment Order
 
 1. **Supabase — done.** Project `restoration-gc-engine` (ref `bccpaguzuowwgokxgsjh`, org `michael@rgcroof.com's Org`, region `us-east-1`) is provisioned and migrated: `001_init.sql` through `006_seed.sql` applied, verified against `007_verify.sql` (PostGIS 3.3.7 active, RLS enabled with ≥1 policy on all 11 app tables, 11 compliance rules seeded across TX/IL/FL/OK/OTHER). A follow-up hardening pass closed everything the security/performance advisors could flag except three PostGIS/platform-level items documented in `007_verify.sql` (RLS on the `spatial_ref_sys` system table, the `postgis`/`citext` extensions living in the `public` schema, and `st_estimatedextent`'s `SECURITY DEFINER` grant) — all low-risk and left as-is. **Note:** the same org also holds an older, unrelated-looking paused project (`rgcroof12`) — this build uses `restoration-gc-engine`, not that one; don't point env vars at `rgcroof12` by mistake.
-   - Grab `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_KEY` for the env checklist below from this project's API settings before continuing to step 4.
+   - `SUPABASE_URL` and `SUPABASE_ANON_KEY` are pulled below. `SUPABASE_SERVICE_KEY` still needs to be grabbed manually (see the checklist) before continuing to step 4.
 2. **HubSpot:** create the `restorationgc` property group; `POST` each entry in `02-hubspot/custom_properties.json`; build the 4 workflows in `02-hubspot/workflows.md`; note the `subscriptionTypeId`s you create for use in the lead-magnet pages.
 3. **n8n:** create all named credentials (see `03-n8n/fastapi_webhook_contract.md`); import W1; build W2–W7 from their specs; set webhook URLs; **keep W4 disabled.**
 4. **Lead magnets:** host the 5 pages in `05-lead-magnets/` (e.g., on rgchub.com); replace the `__HS_PORTAL_ID__`, `__HS_FORM_GUID__`, `__SUPABASE_URL__`, `__SUPABASE_ANON_KEY__`, and `__EMAIL_SUB_ID__` placeholders.
@@ -57,6 +57,17 @@ flowchart LR
 ## Env / Credential Checklist
 
 `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_ANON_KEY`, `HUBSPOT_PRIVATE_APP_TOKEN`, `HS_PORTAL_ID`, `HS_FORM_GUID` (×5, one per lead magnet), `EMAIL_SUB_ID`, `OPENAI_API_KEY`, `RETELL_API_KEY`, `FASTAPI_HMAC_SECRET`, `LINKEDIN_CLIENT_ID`/`LINKEDIN_CLIENT_SECRET`, `GMAIL_OAUTH`.
+
+**Supabase values for the provisioned `restoration-gc-engine` project** (ref `bccpaguzuowwgokxgsjh`):
+
+| Var | Value |
+|---|---|
+| `SUPABASE_URL` | `https://bccpaguzuowwgokxgsjh.supabase.co` |
+| `SUPABASE_ANON_KEY` (legacy JWT anon key) | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjY3BhZ3V6dW93d2dva3hnc2poIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwMDUxNDksImV4cCI6MjEwNTU4MTE0OX0.Ae-YTG2re904E0xaT3sdRLOA3ug_L9mdVPHDJddhLic` |
+| Modern equivalent (`sb_publishable_...`, recommended for new setups) | `sb_publishable_jrNisMpe0JdAdODEuFrsYQ_wTUY8lBp` |
+| `SUPABASE_SERVICE_KEY` | **Not pulled here** — it bypasses RLS entirely and the Supabase tooling used to provision this project deliberately doesn't expose it. Grab it yourself: Supabase Dashboard → this project → Project Settings → API → Project API keys → `service_role`. Only ever put it in n8n's `RGC_SUPABASE_SERVICE` credential and the FastAPI backend's env — never in the lead-magnet HTML pages or any client-side code. |
+
+Both the anon key and the publishable key are safe to embed client-side (in the lead-magnet pages' `__SUPABASE_ANON_KEY__` placeholder) — they're meant to be public and are constrained entirely by the RLS policies in `01-supabase/004_rls.sql`.
 
 ## Requires MJ's Own Credentials / Approval
 
