@@ -1,5 +1,7 @@
 # FastAPI Webhook Contract — api.restorationgc.net
 
+**Implemented** in `10-fastapi/main.py` (with 14 passing tests in `10-fastapi/test_main.py`) — this document is the contract it implements; see `10-fastapi/README.md` for env vars and deploy notes.
+
 ```
 POST /webhooks/storm-alert     (HMAC header X-RGC-Signature = hex(hmac_sha256(secret, raw_body)))
   body: {event_id, event_type, event_ts(ISO8601), max_hail_size_in, max_wind_mph, state, swath_geojson?, properties:[{parcel_id,address,geom_geojson,roof_sqft}]}

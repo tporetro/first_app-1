@@ -18,7 +18,8 @@ restoration-gc-engine/
 │                           Lead Gen Form spec, outreach templates
 ├── 07-content/             30-day evergreen content calendar, curriculum spine, storm-response pack
 ├── 08-testing/             Test plan, 44-prompt compliance red-team suite, fixtures
-└── 09-docs/                Risk register, detailed state-law reference
+├── 09-docs/                Risk register, detailed state-law reference
+└── 10-fastapi/             FastAPI webhook backend (storm-alert, approve, retell-status) + tests
 ```
 
 > Note: the source blueprint's file tree lists `W1..W7.json`. Only W1 is a fully importable n8n workflow JSON in this build; W2–W7 are delivered as node-by-node specs (`.md`) using the same n8n node vocabulary, to be assembled and pinned to your installed node `typeVersion`s in your n8n instance (see `03-n8n/` for details).
@@ -51,7 +52,7 @@ flowchart LR
    - Create 5 HubSpot Forms (Marketing → Forms), one per lead magnet, and copy each form's GUID into that page's `__HS_FORM_GUID_<MAGNET>__` placeholder (e.g. `__HS_FORM_GUID_SCORECARD__` in `scorecard.html`).
    - Create (or find) the "Email educational information" Subscription Type under Settings → Communication Preferences, and replace `__EMAIL_SUB_ID__` (all 5 pages) with its numeric ID.
    - Host the 5 pages somewhere (e.g. rgchub.com) — bring your own static host (Netlify, Vercel, Cloudflare Pages, S3, etc.); this session has no hosting/deploy connector attached.
-5. **FastAPI:** add the 3 endpoints in `03-n8n/fastapi_webhook_contract.md` with HMAC verification.
+5. **FastAPI — done.** `10-fastapi/main.py` implements all 3 endpoints with HMAC verification; 14 tests in `10-fastapi/test_main.py` were run against the real code (not just read over) and all pass — HMAC verification, payload validation, n8n forwarding + downstream-failure handling, the approve endpoint's idempotency, and the retell-status consent/disclosure gate. Deploy it to any ASGI host (Railway, Fly.io, your own container) — no hosting connector is attached to this session, so provisioning wherever it runs is on you. See `10-fastapi/README.md` for env vars and deploy notes.
 6. **LinkedIn:** file the Community Management API application (`06-linkedin/community_api_application.md`); publish the profile/Company Page rewrite (`06-linkedin/profile_rewrite.md`).
 7. **Content:** load the 30-day calendar (`07-content/30_day_evergreen.md`) into `content_drafts`.
 8. **Counsel review:** have counsel review the compliance lexicon (`01-supabase/006_seed.sql`) and all disclaimers before the first live send.
