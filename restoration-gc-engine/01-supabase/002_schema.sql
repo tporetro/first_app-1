@@ -80,6 +80,7 @@ create table if not exists public.content_drafts (
   title text,
   body text not null,
   asset_urls text[] default '{}',            -- rendered carousel PDFs, images, video links produced by the Content Repurposing Agent
+  scheduled_date date,                        -- for mode=evergreen calendar rows: the date W3 should pick this row up on; null for AI-generated/storm-response drafts created after the fact
   compliance_status draft_status not null default 'generated',
   compliance_report jsonb,
   storm_event_id uuid references public.storm_events(id) on delete set null,
