@@ -1,5 +1,17 @@
 # HubSpot Workflows
 
+## Prerequisite: Custom Properties
+
+Run `create_properties.py` before building any of these workflows — HubSpot's workflow editor can only branch on properties that already exist:
+
+```
+export HUBSPOT_PRIVATE_APP_TOKEN=pat-na1-xxxxxxxx   # from a private app with crm.schemas.contacts.write scope
+python3 create_properties.py            # creates the restorationgc group + 12 properties on Contacts
+python3 create_properties.py --dry-run  # preview without calling the API
+```
+
+**Why a script and not an MCP tool:** the HubSpot integration available in this session manages CRM records (contacts, deals, companies) and marketing content (emails, landing pages, blog posts) — there's no tool exposed for creating custom property *definitions* or automation *workflows* themselves. The script above closes the properties gap via HubSpot's own CRM v3 Properties API. The 4 workflows below still have to be built by hand in HubSpot's workflow editor (Automation → Workflows → Create workflow) — there's no API shortcut for the branching logic itself, only for the properties it reads.
+
 ## 1. Lead-Magnet Enrollment
 - **Trigger:** `rgc_lead_magnet` is known (any value set).
 - **Actions:** set lifecycle stage = Lead; set lead status = Educating; enroll contact in the owner-type nurture workflow (#2); create an `attribution_events` row (via W2/W5, `event_name = form_submit`).
