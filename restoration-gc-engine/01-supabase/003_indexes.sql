@@ -20,6 +20,13 @@ create index if not exists idx_lms_synced on public.lead_magnet_submissions (hub
 create index if not exists idx_consent_owner on public.consent_records (owner_id);
 create index if not exists idx_consent_phone on public.consent_records (phone);
 create index if not exists idx_li_metrics_date on public.linkedin_metrics (metric_date desc);
+-- FK-covering indexes (flagged by the Supabase performance advisor if omitted)
+create index if not exists idx_approval_queue_draft on public.approval_queue (content_draft_id);
+create index if not exists idx_attr_owner on public.attribution_events (owner_id);
+create index if not exists idx_drafts_storm_event on public.content_drafts (storm_event_id);
+create index if not exists idx_lms_owner on public.lead_magnet_submissions (owner_id);
+create index if not exists idx_owners_property on public.owners (property_id);
+create index if not exists idx_properties_storm_event on public.properties (storm_event_id);
 -- Constraints
 alter table public.storm_events add constraint chk_hail_nonneg check (max_hail_size_in is null or max_hail_size_in >= 0);
 alter table public.consent_records add constraint chk_consent_disclosure check (channel <> 'voice' or ai_voice_disclosed = true);

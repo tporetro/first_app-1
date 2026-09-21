@@ -43,7 +43,8 @@ flowchart LR
 
 ## Deployment Order
 
-1. **Supabase:** run `01-supabase/001_init.sql` through `007_verify.sql` in order in the SQL editor; confirm PostGIS + RLS via `007_verify.sql`.
+1. **Supabase — done.** Project `restoration-gc-engine` (ref `bccpaguzuowwgokxgsjh`, org `michael@rgcroof.com's Org`, region `us-east-1`) is provisioned and migrated: `001_init.sql` through `006_seed.sql` applied, verified against `007_verify.sql` (PostGIS 3.3.7 active, RLS enabled with ≥1 policy on all 11 app tables, 11 compliance rules seeded across TX/IL/FL/OK/OTHER). A follow-up hardening pass closed everything the security/performance advisors could flag except three PostGIS/platform-level items documented in `007_verify.sql` (RLS on the `spatial_ref_sys` system table, the `postgis`/`citext` extensions living in the `public` schema, and `st_estimatedextent`'s `SECURITY DEFINER` grant) — all low-risk and left as-is. **Note:** the same org also holds an older, unrelated-looking paused project (`rgcroof12`) — this build uses `restoration-gc-engine`, not that one; don't point env vars at `rgcroof12` by mistake.
+   - Grab `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_KEY` for the env checklist below from this project's API settings before continuing to step 4.
 2. **HubSpot:** create the `restorationgc` property group; `POST` each entry in `02-hubspot/custom_properties.json`; build the 4 workflows in `02-hubspot/workflows.md`; note the `subscriptionTypeId`s you create for use in the lead-magnet pages.
 3. **n8n:** create all named credentials (see `03-n8n/fastapi_webhook_contract.md`); import W1; build W2–W7 from their specs; set webhook URLs; **keep W4 disabled.**
 4. **Lead magnets:** host the 5 pages in `05-lead-magnets/` (e.g., on rgchub.com); replace the `__HS_PORTAL_ID__`, `__HS_FORM_GUID__`, `__SUPABASE_URL__`, `__SUPABASE_ANON_KEY__`, and `__EMAIL_SUB_ID__` placeholders.

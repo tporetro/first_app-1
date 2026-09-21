@@ -1,7 +1,9 @@
+-- Note: auth.role() is wrapped in (select ...) below so the query planner evaluates it
+-- once per statement instead of once per row (Supabase performance advisor: auth_rls_initplan).
 do $$ declare t text; begin
   foreach t in array array['storm_events','portfolios','properties','owners','compliance_rules','content_drafts','approval_queue','attribution_events','lead_magnet_submissions','consent_records','linkedin_metrics']
   loop execute format('alter table public.%I enable row level security;', t);
-    execute format($p$create policy "service_all_%1$s" on public.%1$I for all to service_role using (auth.role() = 'service_role') with check (auth.role() = 'service_role');$p$, t);
+    execute format($p$create policy "service_all_%1$s" on public.%1$I for all to service_role using ((select auth.role()) = 'service_role') with check ((select auth.role()) = 'service_role');$p$, t);
   end loop;
 end $$;
 -- Public lead-magnet capture (anon key, insert only)
