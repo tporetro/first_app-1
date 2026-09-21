@@ -14,3 +14,7 @@
 # Ignore all logfiles and tempfiles.
 /log/*.log
 /tmp
+
+# Python bytecode cache (restoration-gc-engine/02-hubspot/create_properties.py)
+__pycache__/
+*.pyc
