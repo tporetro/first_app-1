@@ -25,3 +25,5 @@ Whichever source is used, populate `properties[].geom_geojson` from parcel data,
 
 Create these as named credentials in n8n → Credentials before importing W1–W7:
 `RGC_SUPABASE_SERVICE`, `RGC_HUBSPOT_PRIVATE_APP`, `RGC_GMAIL_OAUTH`, `RGC_OPENAI`, `RGC_FASTAPI_HMAC`, `RGC_RETELL_API`, `RGC_LINKEDIN_OAUTH`.
+
+**Scripted setup:** `setup_n8n.py` in this directory creates the secret/API-key-based credentials (`RGC_SUPABASE_SERVICE`, `RGC_OPENAI`, `RGC_RETELL_API`, `RGC_FASTAPI_HMAC`) via n8n's REST API and imports W1, given an n8n instance URL + API key (`Settings → n8n API → Create an API key`). `RGC_GMAIL_OAUTH` and `RGC_LINKEDIN_OAUTH` cannot be scripted — they're OAuth2 credentials that need a human to complete the consent redirect in the n8n editor UI; there's no API-only path around that for either provider. `RGC_HUBSPOT_PRIVATE_APP` also isn't in the script since it's a single static token, easiest pasted directly into n8n's HubSpot credential form. See the script's docstring for exact env vars and usage.
