@@ -67,9 +67,12 @@ create table if not exists public.compliance_rules (
   suggested_rewrite text,
   citation_url text,
   active boolean not null default true,
+  applies_to text not null default 'content',   -- content (content_drafts, checked by the Compliance-Gate Agent) | contract (actual signed contracts -- generated via DocuSign, never via content_drafts; e.g. tx_contract_notice)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table public.compliance_rules drop constraint if exists chk_applies_to;
+alter table public.compliance_rules add constraint chk_applies_to check (applies_to in ('content','contract'));
 -- CONTENT DRAFTS
 create table if not exists public.content_drafts (
   id uuid primary key default uuid_generate_v4(),

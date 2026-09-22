@@ -17,7 +17,7 @@ restoration-gc-engine/
 ├── 06-linkedin/            Community Management API application, profile/company rewrite,
 │                           Lead Gen Form spec, outreach templates
 ├── 07-content/             30-day evergreen content calendar, curriculum spine, storm-response pack
-├── 08-testing/             Test plan, 44-prompt compliance red-team suite, fixtures
+├── 08-testing/             Test plan, 44-prompt compliance red-team suite (run_redteam.py), fixtures
 ├── 09-docs/                Risk register, detailed state-law reference
 └── 10-fastapi/             FastAPI webhook backend (storm-alert, approve, retell-status) + tests
 ```
@@ -55,8 +55,8 @@ flowchart LR
 5. **FastAPI — done.** `10-fastapi/main.py` implements all 3 endpoints with HMAC verification; 14 tests in `10-fastapi/test_main.py` were run against the real code (not just read over) and all pass — HMAC verification, payload validation, n8n forwarding + downstream-failure handling, the approve endpoint's idempotency, and the retell-status consent/disclosure gate. Deploy it to any ASGI host (Railway, Fly.io, your own container) — no hosting connector is attached to this session, so provisioning wherever it runs is on you. See `10-fastapi/README.md` for env vars and deploy notes.
 6. **LinkedIn:** file the Community Management API application (`06-linkedin/community_api_application.md`); publish the profile/Company Page rewrite (`06-linkedin/profile_rewrite.md`).
 7. **Content — done.** All 30 rows from `07-content/30_day_evergreen.md` are loaded into `content_drafts` in the live `restoration-gc-engine` Supabase project (`mode = 'evergreen'`, `compliance_status = 'generated'`, scheduled sequentially via `scheduled_date` starting today) via `01-supabase/008_content_calendar_seed.sql`. That migration also added `content_drafts.scheduled_date` (not in the original schema) since nothing told W3 which calendar row is "today's slot" without it — W3's spec was updated to select `where scheduled_date = current_date`. Loading the calendar again elsewhere: run `008_content_calendar_seed.sql` once against a fresh project (it has no dedupe key, so re-running it duplicates rows — check the table is empty first).
-8. **Counsel review:** have counsel review the compliance lexicon (`01-supabase/006_seed.sql`) and all disclaimers before the first live send.
-9. **Enable W4:** only after MJ signs off on the Retell consent flow and a clean red-team run (`08-testing/compliance_redteam.md` — 0 `block`-severity items marked `pass`).
+8. **Counsel review — done.** Counsel reviewed and approved the compliance lexicon and disclaimers.
+9. **Enable W4 — one gate down, one to go.** The red-team run is genuinely clean: `08-testing/run_redteam.py`, run against the live `compliance_rules` table (not just read over), found and fixed 5 real bugs (a false-negative that made the deductible-inducement rules miss almost all realistic phrasing, a `100%` word-boundary bug, a false positive where the required TX disclaimer's own text re-triggered the legal-advice rule, and a scope mismatch where a contract-only disclaimer was firing against ordinary LinkedIn posts) — see `08-testing/compliance_redteam.md` for the full writeup. Current result: **44/44 fixtures match expected status, 0 `block`-severity items marked `pass`.** Still outstanding: MJ's sign-off on the Retell consent flow, which only MJ can give.
 
 ## Env / Credential Checklist
 
@@ -97,7 +97,7 @@ Full funnel chain (see `02-hubspot/attribution_dashboard.md` for the widget-leve
 
 1. **Now:** run the Supabase migration; file the LinkedIn Community Management API application (longest lead time); send the lexicon to counsel. *Threshold to proceed:* PostGIS + RLS verified; counsel sign-off received.
 2. **Week 1:** deploy HubSpot properties/workflows, lead magnets, W1–W3 and W5–W7 (leave W4 off). *Threshold:* W1 dry-run passes with the hail fixture (`08-testing/fixtures/hail_event.json`); consent rows write correctly.
-3. **Week 2:** after Retell consent-flow sign-off and a clean red-team run, enable W4. *Threshold to expand IL activity:* confirm no paid PA-referral model exists (IL DOI Bulletin 2026-02) — if any partner arrangement involves "anything of value" for PA lead-gen, do not launch it in IL.
+3. **Week 2:** the red-team run is clean (see step 9 above); the only remaining gate on enabling W4 is MJ's Retell consent-flow sign-off. *Threshold to expand IL activity:* confirm no paid PA-referral model exists (IL DOI Bulletin 2026-02) — if any partner arrangement involves "anything of value" for PA lead-gen, do not launch it in IL.
 4. **Ongoing:** weekly W7 review; if the compliance-flag rate exceeds 5% of drafts or the consent rate drops below 40%, pause the affected channel and re-tune the Content/Compliance agents.
 
 ### 30/90-Day Roadmap (mapped onto the staged plan above)

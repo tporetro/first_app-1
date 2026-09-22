@@ -12,7 +12,7 @@ Checks a draft's text against the `compliance_rules` lexicon (banned-phrase rege
 
 ## Rules
 
-- Evaluate every active row in `compliance_rules` scoped to `OTHER` (applies to all states) plus every row scoped to a state present in the draft's `state_tags`.
+- Evaluate every active row in `compliance_rules` where `applies_to = 'content'` (this agent only ever checks `content_drafts` — LinkedIn posts, carousels, newsletters, video scripts, comments, DMs, emails — never actual signed contracts, which are generated via DocuSign outside this pipeline) AND is scoped to `OTHER` (applies to all states) or to a state present in the draft's `state_tags`. Rows with `applies_to = 'contract'` (e.g. `tx_contract_notice`, the TX Bus. & Com. Code §27.02(b) boldface notice) belong to a separate contract-review checklist and must not be checked here — a real red-team run found this rule firing against ordinary LinkedIn posts before the `applies_to` column was added; see `08-testing/compliance_redteam.md`.
 - Any match with `severity = block` means `status` MUST be `"rewrite"` or `"flag"` — **never** `"pass"`.
 - `status = "rewrite"`: the agent proposes a corrected version of the full draft in the `rewrite` field with the violating spans replaced by the rule's `suggested_rewrite` (or an equivalent compliant phrasing).
 - `status = "flag"`: used when a required disclaimer is simply missing (nothing to rewrite in the body — a disclaimer needs to be appended). List the missing disclaimer text(s) in `required_disclaimers`.
