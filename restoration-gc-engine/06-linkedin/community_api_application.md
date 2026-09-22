@@ -4,7 +4,7 @@
 - **Legal org:** Restoration GC (restorationgc.net)
 - **Registered address:** 701 Brazos St, Austin, TX 78701
 - **Business email:** michael@restorationgc.net (must be verified)
-- **Privacy policy URL:** hosted at rgchub.com/privacy (required before submission)
+- **Privacy policy URL:** hosted at restorationgc.net/privacy (required before submission)
 
 ## Use Case Statement (for the access-request form)
 
