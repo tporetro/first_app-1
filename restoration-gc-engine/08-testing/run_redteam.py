@@ -16,8 +16,14 @@ the LLM is checking the same underlying rule set. This is a necessary,
 not sufficient, condition for "a clean red-team run."
 
 Usage:
-    export SUPABASE_URL=... SUPABASE_SERVICE_KEY=...   # or SUPABASE_ANON_KEY, read-only
+    export SUPABASE_URL=... SUPABASE_SERVICE_KEY=...
     python3 run_redteam.py
+
+Needs a key that can actually read compliance_rules: service_role, or an
+authenticated-session JWT (the auth_read_rules RLS policy is scoped to
+`authenticated`, not `anon`). SUPABASE_ANON_KEY will silently return zero
+rows and every fixture will show actual=pass -- this was verified directly
+against the live project, not assumed from reading the RLS policy.
 """
 import json
 import os
@@ -84,6 +90,14 @@ FIXTURES = [
     (42, "Ask your independent public adjuster about code-upgrade coverage", ["IL"], "pass"),
     (43, "Your policy's deductible amount is listed on your declarations page", [], "pass"),
     (44, "A licensed public adjuster or attorney can advise you on legal options", [], "pass"),
+    # J. il_no_deductible educational-framing false positive (found via content-calendar
+    # review, not a hand-written fixture): the original pattern had no first-person/offer
+    # scoping like tx_no_deductible/ok_no_deductible do, so it fired on ANY mention of
+    # waiving/absorbing/inflating near "deductible" -- including compliant educational
+    # content explaining the ban itself (exactly what the loaded 30-day calendar's Day 22
+    # "IL deductible-fraud statute explained" post needs to say).
+    (45, "Illinois law prohibits a contractor from waiving or absorbing your deductible.", ["IL"], "pass"),
+    (46, "A contractor may not inflate an estimate to cover your deductible under Illinois law.", ["IL"], "pass"),
 ]
 
 
@@ -127,7 +141,16 @@ def main() -> int:
     try:
         rules = fetch_rules()
     except KeyError as e:
-        print(f"ERROR: set SUPABASE_URL and SUPABASE_SERVICE_KEY (or SUPABASE_ANON_KEY): missing {e}", file=sys.stderr)
+        print(f"ERROR: set SUPABASE_URL and SUPABASE_SERVICE_KEY: missing {e}", file=sys.stderr)
+        return 1
+
+    # A key without read access to compliance_rules (e.g. the anon key -- its RLS policy
+    # doesn't cover this table) returns an empty list rather than an auth error, which would
+    # otherwise make every fixture silently "pass" and look like a clean run.
+    if not rules:
+        print("ERROR: fetched 0 active rules -- your key likely can't read compliance_rules "
+              "(needs service_role or an authenticated-session JWT, not the anon key). "
+              "Refusing to report a run against an empty rule set as meaningful.", file=sys.stderr)
         return 1
 
     print(f"Loaded {len(rules)} active rules from the live compliance_rules table.\n")

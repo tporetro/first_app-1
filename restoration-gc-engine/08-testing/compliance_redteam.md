@@ -1,10 +1,10 @@
-# Compliance-Gate Red-Team Test Plan (44 prompts)
+# Compliance-Gate Red-Team Test Plan (46 prompts)
 
 Each prompt is run through the Compliance-Gate Agent (`04-agents/compliance_gate.md`) against the seeded `compliance_rules` lexicon (`01-supabase/006_seed.sql`). Expected `status` is given for each. **Invariant under test:** any `severity = block` rule match must never yield `status = "pass"`.
 
 ## Results — Actually Run, Not Just Read
 
-`run_redteam.py` is a reference implementation of the gate's deterministic layer (banned-phrase regex + required-disclaimer presence — the part that doesn't need an LLM call). It was run against the live `compliance_rules` table in the provisioned Supabase project. **Current result: 44/44 fixtures match their expected status, 0 invariant violations.**
+`run_redteam.py` is a reference implementation of the gate's deterministic layer (banned-phrase regex + required-disclaimer presence — the part that doesn't need an LLM call). It was run against the live `compliance_rules` table in the provisioned Supabase project. **Current result: 46/46 fixtures match their expected status, 0 invariant violations.**
 
 That result required fixing 5 real bugs found by actually executing this suite (not just reading the regexes), all applied live and folded back into `01-supabase/006_seed.sql`:
 1. **`us_no_guarantee`** — `\b100%\b` never matched "100% of homeowners..." because `\b` can't find a boundary between `%` and a following space (both non-word characters). Added a lookahead alternative.
@@ -15,7 +15,11 @@ That result required fixing 5 real bugs found by actually executing this suite (
 
 One fixture (`#43`) needed re-scoping rather than a lexicon fix: it was TX-tagged to test that an informational deductible mention ("your policy's deductible amount is listed on your declarations page") doesn't false-positive on the inducement pattern — a universal concern, not a TX-specific one — but the TX tag also pulled in the (unrelated) TX disclaimer requirement. Removed the TX tag; the fixture now correctly tests only what it was meant to.
 
-Run it yourself: `python3 run_redteam.py` (needs `SUPABASE_URL` + a key with read access to `compliance_rules`, i.e. `service_role` or an authenticated session — the `anon` key's RLS policy doesn't cover this table).
+**A 6th bug was found in a later pass, while verifying the loaded 30-day content calendar (`07-content/30_day_evergreen.md`) rather than by hand-writing a fixture.** Day 22 of that calendar is "IL 215 ILCS 5/155.51 deductible-fraud statute explained for property managers" — exactly the compliant, educational content this system exists to produce. But `il_no_deductible`, unlike `tx_no_deductible`/`ok_no_deductible`, had no first-person/offer subject scoping: `\b(waive|absorb|inflate)\b.{0,40}\bdeductible\b` fires on *any* mention of those words near "deductible", regardless of who's doing the waiving. A compliant sentence like "Illinois law prohibits a contractor from waiving your deductible" would have been forced into `status = "rewrite"` at `block` severity — the gate would have rejected its own required educational content. Fixed by adding the same `we(?:'ll| will| can| could| may)?` subject requirement TX/OK already use, so the rule still catches an actual offer ("we'll waive your deductible") but not a third-person explanation of the law. Added as fixtures #45–46 (both expect `pass`).
+
+A **7th issue**, in the test harness rather than the lexicon itself: `run_redteam.py`'s docstring claimed `SUPABASE_ANON_KEY` would work as a read-only fallback. It doesn't — `compliance_rules`' RLS policy (`auth_read_rules`) is scoped to `authenticated`, not `anon`, so the anon key silently returns zero rows rather than an auth error. Every fixture then evaluates against an empty rule set and reports `actual=pass` across the board — a run that looks clean while testing nothing. Fixed the docstring and added an explicit zero-rules guard in `main()` that refuses to report a result rather than let this happen silently again.
+
+Run it yourself: `python3 run_redteam.py` (needs `SUPABASE_URL` + a key with read access to `compliance_rules`, i.e. `service_role` or an authenticated session — the `anon` key's RLS policy doesn't cover this table, and the script now refuses to run rather than silently report a false pass).
 
 ## A. Universal banned-phrase tests (scope_state = OTHER, applies in every state)
 
