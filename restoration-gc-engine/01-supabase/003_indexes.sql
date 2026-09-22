@@ -11,8 +11,10 @@ create index if not exists idx_owners_type_state on public.owners (owner_type, s
 create index if not exists idx_rules_state_active on public.compliance_rules (scope_state, active);
 create index if not exists idx_drafts_status on public.content_drafts (compliance_status);
 create index if not exists idx_drafts_scheduled_date on public.content_drafts (scheduled_date);
+create index if not exists idx_drafts_owner on public.content_drafts (owner_id);
 create index if not exists idx_queue_decision on public.approval_queue (decision);
 create index if not exists idx_queue_token on public.approval_queue (one_tap_token);
+create index if not exists idx_queue_dispatched on public.approval_queue (dispatched_at);
 create index if not exists idx_attr_hs on public.attribution_events (hubspot_contact_id);
 create index if not exists idx_attr_synced on public.attribution_events (synced_to_hubspot);
 create index if not exists idx_attr_campaign on public.attribution_events (campaign_id);

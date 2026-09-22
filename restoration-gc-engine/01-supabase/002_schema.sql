@@ -84,6 +84,7 @@ create table if not exists public.content_drafts (
   body text not null,
   asset_urls text[] default '{}',            -- rendered carousel PDFs, images, video links produced by the Content Repurposing Agent
   scheduled_date date,                        -- for mode=evergreen calendar rows: the date W3 should pick this row up on; null for AI-generated/storm-response drafts created after the fact
+  owner_id uuid references public.owners(id) on delete set null,  -- set for owner-specific email/dm/voice-talk-track drafts (e.g. the storm-response owner briefing email); null for general content (LinkedIn posts, newsletters)
   compliance_status draft_status not null default 'generated',
   compliance_report jsonb,
   storm_event_id uuid references public.storm_events(id) on delete set null,
@@ -100,6 +101,7 @@ create table if not exists public.approval_queue (
   assigned_to text default 'michael@restorationgc.net',
   decision text,                             -- approve | edit | reject | pending
   decision_ts timestamptz,
+  dispatched_at timestamptz,                  -- set by W4 after a successful send_email/dispatch_voice; distinct from decision_ts (approval time) so a scheduled W4 run never re-sends an already-dispatched item
   edited_body text,
   one_tap_token uuid default uuid_generate_v4(),
   created_at timestamptz not null default now(),

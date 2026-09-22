@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
 Creates the n8n credentials this build's workflows reference, and imports
-W1 (the only workflow shipped as full, importable JSON — see W2-W7's .md
-specs for the rest, which still need to be built by hand in the editor).
+W1 and W4 (the two workflows shipped as full, importable JSON — see the
+other workflows' .md specs, which still need to be built by hand in the
+editor). Both import INACTIVE regardless of any gate below; activating
+W4 in the n8n editor is a deliberate manual step, never done by this
+script — see the "IMPORTANT: W4" note below.
 
 Usage:
     export N8N_BASE_URL=https://your-instance.app.n8n.cloud   # no trailing slash
@@ -19,10 +22,21 @@ Usage:
     export RETELL_API_KEY=...
     export FASTAPI_HMAC_SECRET=...
 
-    python3 setup_n8n.py            # create credentials + import W1
+    python3 setup_n8n.py            # create credentials + import W1 and W4
     python3 setup_n8n.py --dry-run  # preview without calling the API
 
 Requires only the Python standard library.
+
+IMPORTANT: W4 dispatches real emails and (via Retell) real AI-voice phone
+calls once active. This script imports it INACTIVE, same as W1 — n8n's
+create-workflow API defaults to inactive and this script never overrides
+that. Activating W4 is a manual step in the n8n editor and should only
+happen after BOTH: (1) MJ's own sign-off on the Retell consent flow
+(nothing in code can substitute for a human verifying that flow works
+end to end), and (2) a clean compliance red-team run
+(08-testing/compliance_redteam.md / run_redteam.py). Pass --skip-w4 to
+import only W1 if you are not ready for W4 to exist in your instance at
+all yet.
 
 WHAT THIS SCRIPT CANNOT DO, AND WHY (not a bug - an n8n/OAuth constraint):
   RGC_GMAIL_OAUTH and RGC_LINKEDIN_OAUTH are OAuth2 credentials. n8n's API can
@@ -48,6 +62,7 @@ import urllib.request
 from pathlib import Path
 
 W1_FILE = Path(__file__).parent / "W1_storm_detect_to_queue.json"
+W4_FILE = Path(__file__).parent / "W4_consent_gated_dispatch.json"
 
 # name -> (n8n credential type, {field: env_var}) for the credentials this
 # script CAN create end-to-end via API (secret/API-key based, not OAuth).
@@ -67,7 +82,8 @@ SCRIPTABLE_CREDENTIALS = {
     "RGC_OPENAI": ("openAiApi", {"apiKey": "OPENAI_API_KEY"}),
     # Retell has no native n8n node/credential type; W4 calls it via an HTTP
     # Request node, so we store the key as a generic header-auth credential.
-    "RGC_RETELL_API": ("httpHeaderAuth", {"name": "__literal__Authorization", "value": "RETELL_API_KEY"}),
+    # Retell's API expects "Authorization: Bearer <key>", not the bare key.
+    "RGC_RETELL_API": ("httpHeaderAuth", {"name": "__literal__Authorization", "value": "__bearer__RETELL_API_KEY"}),
     # Likewise the FastAPI HMAC secret isn't a credential type of its own -
     # store it the same way for any node that needs to read it.
     "RGC_FASTAPI_HMAC": ("httpHeaderAuth", {"name": "__literal__X-RGC-Signature-Secret", "value": "FASTAPI_HMAC_SECRET"}),
@@ -100,6 +116,14 @@ def create_credential(name: str, cred_type: str, field_env_map: dict, base_url: 
         if env_ref.startswith("__literal__"):
             data[field] = env_ref[len("__literal__"):]
             continue
+        if env_ref.startswith("__bearer__"):
+            real_ref = env_ref[len("__bearer__"):]
+            value = os.environ.get(real_ref)
+            if value is None:
+                missing.append(real_ref)
+            else:
+                data[field] = f"Bearer {value}"
+            continue
         value = os.environ.get(env_ref)
         if value is None:
             missing.append(env_ref)
@@ -119,8 +143,8 @@ def create_credential(name: str, cred_type: str, field_env_map: dict, base_url: 
         print(f"ERROR creating credential '{name}': HTTP {status} — {resp}", file=sys.stderr)
 
 
-def import_w1(base_url: str, api_key: str, dry_run: bool) -> None:
-    workflow = json.loads(W1_FILE.read_text())
+def import_workflow(file_path: Path, base_url: str, api_key: str, dry_run: bool, activation_note: str) -> None:
+    workflow = json.loads(file_path.read_text())
     # The public API accepts name/nodes/connections/settings on create; strip
     # anything else the raw export might carry (e.g. an id from a prior export).
     body = {
@@ -134,9 +158,9 @@ def import_w1(base_url: str, api_key: str, dry_run: bool) -> None:
         return
     status, resp = api_request("POST", "/api/v1/workflows", base_url, api_key, body)
     if status in (200, 201):
-        print(f"imported workflow '{body['name']}' (id={resp.get('id')}) — left INACTIVE, activate manually once credentials are wired to its nodes")
+        print(f"imported workflow '{body['name']}' (id={resp.get('id')}) — left INACTIVE. {activation_note}")
     else:
-        print(f"ERROR importing W1: HTTP {status} — {resp}", file=sys.stderr)
+        print(f"ERROR importing {file_path.name}: HTTP {status} — {resp}", file=sys.stderr)
 
 
 def print_oauth_instructions() -> None:
@@ -149,7 +173,8 @@ def print_oauth_instructions() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dry-run", action="store_true", help="print what would happen without calling the n8n API")
-    parser.add_argument("--skip-import", action="store_true", help="only create credentials, don't import W1")
+    parser.add_argument("--skip-import", action="store_true", help="only create credentials, don't import W1 or W4")
+    parser.add_argument("--skip-w4", action="store_true", help="import W1 only; don't create W4 in this n8n instance at all yet")
     args = parser.parse_args()
 
     base_url = os.environ.get("N8N_BASE_URL", "").rstrip("/")
@@ -162,7 +187,12 @@ def main() -> None:
         create_credential(name, cred_type, field_env_map, base_url, api_key, args.dry_run)
 
     if not args.skip_import:
-        import_w1(base_url, api_key, args.dry_run)
+        import_workflow(W1_FILE, base_url, api_key, args.dry_run, "Activate manually once credentials are wired to its nodes.")
+        if not args.skip_w4:
+            import_workflow(
+                W4_FILE, base_url, api_key, args.dry_run,
+                "DO NOT ACTIVATE until MJ's Retell consent-flow sign-off AND a clean red-team run are both confirmed — see this script's docstring.",
+            )
 
     print_oauth_instructions()
 
