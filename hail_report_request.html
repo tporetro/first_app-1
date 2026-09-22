@@ -35,12 +35,13 @@ document.getElementById('f').addEventListener('submit',async e=>{e.preventDefaul
    context:{pageUri:location.href,pageName:'Hail-Impact Report Request'},
    legalConsentOptions:{consent:{consentToProcess:true,text:'I agree to allow Restoration GC to store and process my data.',communications:[{value:ec,subscriptionTypeId:'__EMAIL_SUB_ID__',text:'Email educational information'}]}}})}); } catch(err) { console.warn('HubSpot sync failed (check HS_FORM/EMAIL_SUB_ID placeholders):', err); }
  const h={'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+SB_ANON};
- // Creates (or matches) a properties row and a lead_magnet_submissions row; a downstream n8n step geocodes the address and joins storm_events by swath intersection.
- const propRes=await fetch(SB_URL+'/rest/v1/properties',{method:'POST',headers:{...h,Prefer:'return=representation'},body:JSON.stringify({parcel_id:fd.get('parcel_id')||null,address_line1:fd.get('address_line1'),city:fd.get('city'),state:st,postal_code:fd.get('postal_code')})});
- const propJson=await propRes.json().catch(()=>[]);
- const propertyId=Array.isArray(propJson)&&propJson[0]?propJson[0].id:null;
- await fetch(SB_URL+'/rest/v1/lead_magnet_submissions',{method:'POST',headers:h,body:JSON.stringify({magnet_slug:'hail_report',email,full_name:fd.get('full_name'),phone,company:fd.get('company'),state:st,answers:{address_line1:fd.get('address_line1'),city:fd.get('city'),postal_code:fd.get('postal_code'),property_id:propertyId},utm_source:utm('utm_source'),utm_medium:utm('utm_medium'),utm_campaign:utm('utm_campaign'),utm_content:utm('utm_content'),source_url:location.href})});
- await fetch(SB_URL+'/rest/v1/consent_records',{method:'POST',headers:h,body:JSON.stringify([{email,phone,channel:'email',consent_given:ec,consent_text:'Email educational info',source_url:location.href},{email,phone,channel:'voice',consent_given:vc,ai_voice_disclosed:vc,consent_text:'AI-voice/automated call+text consent',source_url:location.href}])});
+ // The raw address is captured in answers below; a service-role backend step (not the anon-key
+ // browser context) creates/matches the properties row from it and joins storm_events by swath
+ // intersection. anon deliberately has no INSERT/SELECT policy on properties - letting the browser
+ // write there directly would be an open, unauthenticated write surface into property records.
+ await fetch(SB_URL+'/rest/v1/lead_magnet_submissions',{method:'POST',headers:h,body:JSON.stringify({magnet_slug:'hail_report',email,full_name:fd.get('full_name'),phone,company:fd.get('company'),state:st,answers:{address_line1:fd.get('address_line1'),city:fd.get('city'),postal_code:fd.get('postal_code'),parcel_id:fd.get('parcel_id')||null},utm_source:utm('utm_source'),utm_medium:utm('utm_medium'),utm_campaign:utm('utm_campaign'),utm_content:utm('utm_content'),source_url:location.href})});
+ // ai_voice_disclosed marks whether the AI-voice disclosure text was shown on this page (always true here, since the checkbox above always carries it) -- distinct from consent_given (did the visitor check the box). Both objects need identical keys or PostgREST rejects the whole batch (PGRST102), and the DB requires ai_voice_disclosed=true on every channel='voice' row regardless of consent_given.
+ await fetch(SB_URL+'/rest/v1/consent_records',{method:'POST',headers:h,body:JSON.stringify([{email,phone,channel:'email',consent_given:ec,ai_voice_disclosed:false,consent_text:'Email educational info',source_url:location.href},{email,phone,channel:'voice',consent_given:vc,ai_voice_disclosed:true,consent_text:'AI-voice/automated call+text consent',source_url:location.href}])});
  document.getElementById('f').outerHTML='<h2>Thanks — your Hail-Impact Report is on its way</h2><p>We\'ll email it to you shortly.</p>';
 });
 </script></body></html>
