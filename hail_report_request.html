@@ -1,0 +1,46 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Free Hail-Impact Report | Restoration GC</title>
+<style>body{font-family:system-ui,Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#111}
+h1{font-size:1.5rem}label{display:block;margin:6px 0}
+button{background:#0b5;color:#fff;border:0;padding:12px 18px;border-radius:8px;font-size:1rem;cursor:pointer}
+.disc{font-size:.8rem;color:#555;margin-top:16px;border-top:1px solid #ddd;padding-top:12px}
+input[type=text],input[type=email]{width:100%;padding:10px;margin:4px 0;border:1px solid #ccc;border-radius:6px}</style></head>
+<body>
+<h1>Free Hail-Impact Report</h1>
+<p>Request a report showing recent verified hail/wind events for your commercial property's address, using public storm data. Educational — not an inspection, adjustment, or damage determination.</p>
+<form id="f">
+ <input type="text" name="address_line1" placeholder="Property street address" required>
+ <input type="text" name="city" placeholder="City" required>
+ <select name="state" id="state" required><option value="">State</option><option>TX</option><option>IL</option><option>FL</option><option>OK</option><option value="OTHER">Other</option></select>
+ <input type="text" name="postal_code" placeholder="ZIP code" required>
+ <input type="text" name="parcel_id" placeholder="Parcel ID (optional)">
+ <input type="text" name="full_name" placeholder="Full name" required>
+ <input type="email" name="email" placeholder="Work email" required>
+ <input type="text" name="company" placeholder="Company / ownership entity">
+ <label><input type="checkbox" id="ec" required> I agree Restoration GC may email me educational information. I can unsubscribe anytime. (Restoration GC, 701 Brazos St, Austin, TX 78701)</label>
+ <label><input type="checkbox" id="vc"> I agree Restoration GC may call/text me, <b>including with an AI-generated voice</b>, at the number I provide, using automated technology. Consent is not a condition of purchase. Msg/data rates may apply.</label>
+ <input type="text" name="phone" placeholder="Phone (only if you check the box above)">
+ <button type="submit">Request my report</button>
+</form>
+<div class="disc" id="disc">Restoration GC is a licensed general contractor, not a public insurance adjuster; this report does not adjust claims, appraise damage, or provide legal advice. It reflects publicly available storm data only and is not a substitute for a physical inspection.</div>
+<script>
+const HS_PORTAL="246969128",HS_FORM="__HS_FORM_GUID_HAIL_REPORT__",SB_URL="https://bccpaguzuowwgokxgsjh.supabase.co",SB_ANON="sb_publishable_jrNisMpe0JdAdODEuFrsYQ_wTUY8lBp";
+function utm(k){return new URLSearchParams(location.search).get(k)||"";}
+document.getElementById('f').addEventListener('submit',async e=>{e.preventDefault();
+ const fd=new FormData(e.target),st=fd.get('state');
+ const email=fd.get('email'),phone=fd.get('phone'),ec=document.getElementById('ec').checked,vc=document.getElementById('vc').checked;
+ // HubSpot Forms v3 (best-effort - a bad/placeholder HS_FORM or subscriptionTypeId must never block the Supabase writes below, which are this system's source of truth)
+ try { await fetch(`https://api.hsforms.com/submissions/v3/integration/submit/${HS_PORTAL}/${HS_FORM}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   fields:[{name:'email',value:email},{name:'firstname',value:fd.get('full_name')},{name:'company',value:fd.get('company')||''},{name:'phone',value:phone||''},{name:'rgc_primary_state',value:st},{name:'rgc_lead_magnet',value:'hail_report'}],
+   context:{pageUri:location.href,pageName:'Hail-Impact Report Request'},
+   legalConsentOptions:{consent:{consentToProcess:true,text:'I agree to allow Restoration GC to store and process my data.',communications:[{value:ec,subscriptionTypeId:'__EMAIL_SUB_ID__',text:'Email educational information'}]}}})}); } catch(err) { console.warn('HubSpot sync failed (check HS_FORM/EMAIL_SUB_ID placeholders):', err); }
+ const h={'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+SB_ANON};
+ // Creates (or matches) a properties row and a lead_magnet_submissions row; a downstream n8n step geocodes the address and joins storm_events by swath intersection.
+ const propRes=await fetch(SB_URL+'/rest/v1/properties',{method:'POST',headers:{...h,Prefer:'return=representation'},body:JSON.stringify({parcel_id:fd.get('parcel_id')||null,address_line1:fd.get('address_line1'),city:fd.get('city'),state:st,postal_code:fd.get('postal_code')})});
+ const propJson=await propRes.json().catch(()=>[]);
+ const propertyId=Array.isArray(propJson)&&propJson[0]?propJson[0].id:null;
+ await fetch(SB_URL+'/rest/v1/lead_magnet_submissions',{method:'POST',headers:h,body:JSON.stringify({magnet_slug:'hail_report',email,full_name:fd.get('full_name'),phone,company:fd.get('company'),state:st,answers:{address_line1:fd.get('address_line1'),city:fd.get('city'),postal_code:fd.get('postal_code'),property_id:propertyId},utm_source:utm('utm_source'),utm_medium:utm('utm_medium'),utm_campaign:utm('utm_campaign'),utm_content:utm('utm_content'),source_url:location.href})});
+ await fetch(SB_URL+'/rest/v1/consent_records',{method:'POST',headers:h,body:JSON.stringify([{email,phone,channel:'email',consent_given:ec,consent_text:'Email educational info',source_url:location.href},{email,phone,channel:'voice',consent_given:vc,ai_voice_disclosed:vc,consent_text:'AI-voice/automated call+text consent',source_url:location.href}])});
+ document.getElementById('f').outerHTML='<h2>Thanks — your Hail-Impact Report is on its way</h2><p>We\'ll email it to you shortly.</p>';
+});
+</script></body></html>

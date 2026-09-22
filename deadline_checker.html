@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Claim Deadline Checker | Restoration GC</title>
+<style>body{font-family:system-ui,Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#111}
+h1{font-size:1.5rem}label{display:block;margin:6px 0}
+button{background:#0b5;color:#fff;border:0;padding:12px 18px;border-radius:8px;font-size:1rem;cursor:pointer}
+.disc{font-size:.8rem;color:#555;margin-top:16px;border-top:1px solid #ddd;padding-top:12px}
+.deadline{background:#f4f4f4;border-radius:8px;padding:12px;margin:8px 0}
+input[type=text],input[type=email],input[type=date]{width:100%;padding:10px;margin:4px 0;border:1px solid #ccc;border-radius:6px}</style></head>
+<body>
+<h1>Commercial Claim Deadline Checker</h1>
+<p>Educational tool only. It calculates statutory notice/response windows from public sources — it is not legal advice and does not evaluate your specific claim.</p>
+<form id="f">
+ <select name="state" id="state" required><option value="">State</option><option>TX</option><option>FL</option><option>OK</option><option>IL</option></select>
+ <input type="date" name="date_of_loss" required placeholder="Date of loss">
+ <input type="text" name="full_name" placeholder="Full name" required>
+ <input type="email" name="email" placeholder="Work email" required>
+ <input type="text" name="company" placeholder="Company / property">
+ <label><input type="checkbox" id="ec" required> I agree Restoration GC may email me educational information. I can unsubscribe anytime. (Restoration GC, 701 Brazos St, Austin, TX 78701)</label>
+ <label><input type="checkbox" id="vc"> I agree Restoration GC may call/text me, <b>including with an AI-generated voice</b>, at the number I provide, using automated technology. Consent is not a condition of purchase. Msg/data rates may apply.</label>
+ <input type="text" name="phone" placeholder="Phone (only if you check the box above)">
+ <button type="submit">Check my deadlines</button>
+</form>
+<div id="result"></div>
+<div class="disc" id="disc">Restoration GC is a licensed general contractor, not a public insurance adjuster; we do not adjust claims or provide legal advice. Confirm all deadlines against your policy and current statute — this tool is educational only.</div>
+<script>
+const HS_PORTAL="246969128",HS_FORM="__HS_FORM_GUID_DEADLINE_CHECKER__",SB_URL="https://bccpaguzuowwgokxgsjh.supabase.co",SB_ANON="sb_publishable_jrNisMpe0JdAdODEuFrsYQ_wTUY8lBp";
+// Verified statutory windows (see 08-testing + STEP-0 lexicon). Re-check current published rates/periods at deploy time.
+const RULES={
+ TX:{label:"Texas",items:[
+   ["Insurer acknowledgment of claim (Ch. 542 TPPCA)","15 days"],
+   ["Insurer accept/reject decision","15 business days of receiving requested info (extendable to 45 days)"],
+   ["Payment of accepted claim","5 business days after acceptance"],
+   ["Weather/'forces of nature' claims (Ch. 542A) — pre-suit notice + inspection right","30 days inspection right after written notice"]]},
+ FL:{label:"Florida",items:[
+   ["New/reopened claim notice deadline (§627.70132)","1 year from date of loss"],
+   ["Supplemental claim notice deadline (§627.70132)","18 months from date of loss"],
+   ["Insurer pay-or-deny decision (§627.70131(7)(a))","60 days after notice (extendable up to 30 days for factors beyond insurer's control)"],
+   ["Insurer acknowledgment","7 days"]]},
+ OK:{label:"Oklahoma",items:[
+   ["Insurer written offer/rejection after proof of loss (36 O.S. §3629)","90 days"],
+   ["Insurer investigation (outer limit; 36 O.S. §1250.7)","60 days (120 days outer limit); +20 days after a governor-declared catastrophe"]]},
+ IL:{label:"Illinois",items:[
+   ["Insurer acknowledgment of claim (215 ILCS 5/154.6)","15 days"]]}
+};
+function utm(k){return new URLSearchParams(location.search).get(k)||"";}
+document.getElementById('f').addEventListener('submit',async e=>{e.preventDefault();
+ const fd=new FormData(e.target),st=fd.get('state'),dol=fd.get('date_of_loss');
+ const rule=RULES[st];
+ const html=rule?`<h2>${rule.label} deadlines from your date of loss</h2>`+rule.items.map(i=>`<div class="deadline"><b>${i[0]}:</b> ${i[1]}</div>`).join(''):'';
+ document.getElementById('result').innerHTML=html;
+ const email=fd.get('email'),phone=fd.get('phone'),ec=document.getElementById('ec').checked,vc=document.getElementById('vc').checked;
+ // HubSpot Forms v3 (best-effort - a bad/placeholder HS_FORM or subscriptionTypeId must never block the Supabase writes below, which are this system's source of truth)
+ try { await fetch(`https://api.hsforms.com/submissions/v3/integration/submit/${HS_PORTAL}/${HS_FORM}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   fields:[{name:'email',value:email},{name:'firstname',value:fd.get('full_name')},{name:'company',value:fd.get('company')||''},{name:'phone',value:phone||''},{name:'rgc_primary_state',value:st},{name:'rgc_lead_magnet',value:'deadline_checker'}],
+   context:{pageUri:location.href,pageName:'Deadline Checker'},
+   legalConsentOptions:{consent:{consentToProcess:true,text:'I agree to allow Restoration GC to store and process my data.',communications:[{value:ec,subscriptionTypeId:'__EMAIL_SUB_ID__',text:'Email educational information'}]}}})}); } catch(err) { console.warn('HubSpot sync failed (check HS_FORM/EMAIL_SUB_ID placeholders):', err); }
+ const h={'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+SB_ANON};
+ await fetch(SB_URL+'/rest/v1/lead_magnet_submissions',{method:'POST',headers:h,body:JSON.stringify({magnet_slug:'deadline_checker',email,full_name:fd.get('full_name'),phone,company:fd.get('company'),state:st,answers:{date_of_loss:dol},utm_source:utm('utm_source'),utm_medium:utm('utm_medium'),utm_campaign:utm('utm_campaign'),utm_content:utm('utm_content'),source_url:location.href})});
+ await fetch(SB_URL+'/rest/v1/consent_records',{method:'POST',headers:h,body:JSON.stringify([{email,phone,channel:'email',consent_given:ec,consent_text:'Email educational info',source_url:location.href},{email,phone,channel:'voice',consent_given:vc,ai_voice_disclosed:vc,consent_text:'AI-voice/automated call+text consent',source_url:location.href}])});
+});
+</script></body></html>
