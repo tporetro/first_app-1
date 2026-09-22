@@ -43,10 +43,11 @@ document.getElementById('f').addEventListener('submit',async e=>{e.preventDefaul
  document.getElementById('result').innerHTML=`<h2>Questions to bring to your insurer</h2><ul>${list}</ul>`;
  document.getElementById('disc').textContent+=" "+(disc[st]||"");
  const email=fd.get('email'),phone=fd.get('phone'),ec=document.getElementById('ec').checked,vc=document.getElementById('vc').checked;
- await fetch(`https://api.hsforms.com/submissions/v3/integration/submit/${HS_PORTAL}/${HS_FORM}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+ // HubSpot Forms v3 (best-effort - a bad/placeholder HS_FORM or subscriptionTypeId must never block the Supabase writes below, which are this system's source of truth)
+ try { await fetch(`https://api.hsforms.com/submissions/v3/integration/submit/${HS_PORTAL}/${HS_FORM}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
    fields:[{name:'email',value:email},{name:'firstname',value:fd.get('full_name')},{name:'company',value:fd.get('company')||''},{name:'phone',value:phone||''},{name:'rgc_primary_state',value:st},{name:'rgc_lead_magnet',value:'underpaid'}],
    context:{pageUri:location.href,pageName:'Underpaid Diagnostic'},
-   legalConsentOptions:{consent:{consentToProcess:true,text:'I agree to allow Restoration GC to store and process my data.',communications:[{value:ec,subscriptionTypeId:__EMAIL_SUB_ID__,text:'Email educational information'}]}}})});
+   legalConsentOptions:{consent:{consentToProcess:true,text:'I agree to allow Restoration GC to store and process my data.',communications:[{value:ec,subscriptionTypeId:'__EMAIL_SUB_ID__',text:'Email educational information'}]}}})}); } catch(err) { console.warn('HubSpot sync failed (check HS_FORM/EMAIL_SUB_ID placeholders):', err); }
  const h={'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+SB_ANON};
  await fetch(SB_URL+'/rest/v1/lead_magnet_submissions',{method:'POST',headers:h,body:JSON.stringify({magnet_slug:'underpaid',email,full_name:fd.get('full_name'),phone,company:fd.get('company'),state:st,answers:{gaps:picked},utm_source:utm('utm_source'),utm_medium:utm('utm_medium'),utm_campaign:utm('utm_campaign'),utm_content:utm('utm_content'),source_url:location.href})});
  await fetch(SB_URL+'/rest/v1/consent_records',{method:'POST',headers:h,body:JSON.stringify([{email,phone,channel:'email',consent_given:ec,consent_text:'Email educational info',source_url:location.href},{email,phone,channel:'voice',consent_given:vc,ai_voice_disclosed:vc,consent_text:'AI-voice/automated call+text consent',source_url:location.href}])});
