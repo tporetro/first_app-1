@@ -5,6 +5,7 @@ Implements the 3 endpoints specified in 03-n8n/fastapi_webhook_contract.md:
   POST /webhooks/storm-alert   - HMAC-verified; forwards validated payload to n8n's W1 webhook
   GET  /approve                 - one-tap approve/edit/reject from the W6 email digest
   POST /webhooks/retell-status  - HMAC-verified; logs a voice-call outcome to Supabase
+  GET  /webhooks/linkedin       - LinkedIn Community Management API validation handshake
 
 Talks to Supabase via its REST API (PostgREST) with the service_role key rather
 than a direct Postgres connection, so this service only needs one dependency
@@ -18,6 +19,9 @@ Environment variables (all required except where noted):
                                  /webhooks/storm-alert validates and returns 202
                                  without forwarding, useful for testing this service
                                  standalone before n8n is wired up)
+  LINKEDIN_CLIENT_SECRET     the app's Client Secret from the LinkedIn Developer
+                             Portal; used only to compute the webhook validation
+                             challengeResponse, never sent anywhere
 
 Run locally:
     pip install -r requirements.txt
@@ -216,6 +220,20 @@ async def retell_status(request: Request, x_rgc_signature: str | None = Header(d
         raise HTTPException(status_code=502, detail="could not log attribution event")
 
     return {"status": "logged", "call_id": payload.call_id, "outcome": payload.outcome}
+
+
+# --------------------------------------------------------------------------
+# GET /webhooks/linkedin — Community Management API validation handshake
+# --------------------------------------------------------------------------
+# LinkedIn calls this with ?challengeCode=... both when the webhook URL is
+# first registered and again every 2 hours to re-validate it; 3 consecutive
+# failures (wrong response shape, non-200, or >3s) gets the webhook blocked.
+# See 06-linkedin/community_api_application.md's application checklist.
+@app.get("/webhooks/linkedin")
+async def linkedin_webhook_validate(challengeCode: str):
+    secret = _env("LINKEDIN_CLIENT_SECRET")
+    challenge_response = hmac.new(secret.encode("utf-8"), challengeCode.encode("utf-8"), hashlib.sha256).hexdigest()
+    return {"challengeCode": challengeCode, "challengeResponse": challenge_response}
 
 
 @app.get("/healthz")

@@ -4,7 +4,7 @@
 - **Legal org:** Restoration GC (restorationgc.net)
 - **Registered address:** 701 Brazos St, Austin, TX 78701
 - **Business email:** michael@restorationgc.net (must be verified)
-- **Privacy policy URL:** hosted at restorationgc.net/privacy (required before submission)
+- **Privacy policy URL:** `https://restorationgc.net/privacy-policy/` — confirmed live (redirects from `/privacy`) and substantive: covers PII collection, cookies/log files, and CCPA/GDPR rights. **Gap:** it does not currently mention LinkedIn, OAuth token handling, or the Community Management API data (Page analytics, comment/reaction data) this app will process — LinkedIn's developer terms expect the privacy policy to disclose what a connected API does with data. Add a short paragraph covering that before submitting the application; this is a live WordPress site (no CMS access from this session) so it needs a manual edit.
 
 ## Use Case Statement (for the access-request form)
 
@@ -32,8 +32,9 @@ High-resolution, downloadable, narrated video; only app screens visible (no othe
 
 ## Application Checklist
 
-- [ ] New app created against our verified Company Page
-- [ ] App name excludes "Linked"/"In" — use **"RGC Engagement Console"**
-- [ ] Page super-admin verifies the app
-- [ ] Apply for Development tier first (12-month window) before requesting Standard tier
-- [ ] Webhook endpoint implements the HMAC challenge handshake (see `03-n8n/fastapi_webhook_contract.md` conventions): return `{challengeCode, challengeResponse}` as JSON with a `200 OK` within 3 seconds, `content-type: application/json`; re-validated by LinkedIn every 2 hours; 3 consecutive failures blocks the webhook.
+- [ ] New app created against our verified Company Page — **manual, LinkedIn Developer Portal**: no LinkedIn connector/API tool is available in this session to do this step for you
+- [x] App name excludes "Linked"/"In" — use **"RGC Engagement Console"**
+- [ ] Page super-admin verifies the app — **manual**, needs a human logged in as the Page's super-admin
+- [ ] Apply for Development tier first (12-month window) before requesting Standard tier — **manual**
+- [x] **Webhook endpoint implements the HMAC challenge handshake — done.** `GET /webhooks/linkedin` in `10-fastapi/main.py` computes `hmac_sha256(LINKEDIN_CLIENT_SECRET, challengeCode)` and returns `{challengeCode, challengeResponse}` as JSON with a `200 OK`; covered by 2 new tests in `10-fastapi/test_main.py` (16/16 passing). Set `LINKEDIN_CLIENT_SECRET` (from the Developer Portal's app "Auth" tab, once the app exists) alongside this service's other env vars, then register `https://<your-fastapi-host>/webhooks/linkedin` as the app's webhook URL — LinkedIn calls it once at registration and again every 2 hours; 3 consecutive failures blocks the webhook.
+- [ ] Privacy policy updated to disclose LinkedIn API data handling (see gap noted above) — **manual**, requires editing the live restorationgc.net WordPress site

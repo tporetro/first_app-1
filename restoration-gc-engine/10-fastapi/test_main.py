@@ -10,6 +10,7 @@ import os
 os.environ["FASTAPI_HMAC_SECRET"] = "test-secret"
 os.environ["SUPABASE_URL"] = "https://example.supabase.co"
 os.environ["SUPABASE_SERVICE_KEY"] = "test-service-key"
+os.environ["LINKEDIN_CLIENT_SECRET"] = "test-linkedin-secret"
 
 import httpx
 import respx
@@ -163,3 +164,17 @@ def test_retell_status_bad_signature():
     body = b'{"call_id":"c3"}'
     r = client.post("/webhooks/retell-status", content=body, headers={"X-RGC-Signature": "bad"})
     assert r.status_code == 401, r.text
+
+
+def test_linkedin_webhook_validation():
+    r = client.get("/webhooks/linkedin", params={"challengeCode": "abc123"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["challengeCode"] == "abc123"
+    expected = hmac.new(b"test-linkedin-secret", b"abc123", hashlib.sha256).hexdigest()
+    assert body["challengeResponse"] == expected
+
+
+def test_linkedin_webhook_validation_missing_challenge_code():
+    r = client.get("/webhooks/linkedin")
+    assert r.status_code == 422, r.text

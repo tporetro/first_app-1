@@ -10,6 +10,9 @@ POST /webhooks/storm-alert     (HMAC header X-RGC-Signature = hex(hmac_sha256(se
 GET  /approve?token=<uuid>&d=approve|edit|reject   (one-tap; writes approval_queue.decision, decision_ts)
 
 POST /webhooks/retell-status   {call_id, owner_id, outcome, consent_verified:bool, ai_disclosed:bool}
+
+GET  /webhooks/linkedin?challengeCode=...   (LinkedIn Community Management API validation handshake)
+  resp 200: {challengeCode, challengeResponse: hex(hmac_sha256(LINKEDIN_CLIENT_SECRET, challengeCode))}
 ```
 
 All endpoints reject with `401` if the signature is invalid, and log to `consent_records`/`attribution_events` as applicable.
