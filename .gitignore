@@ -14,3 +14,9 @@
 # Ignore all logfiles and tempfiles.
 /log/*.log
 /tmp
+
+# Python bytecode cache and pytest cache (restoration-gc-engine/02-hubspot,
+# restoration-gc-engine/03-n8n, restoration-gc-engine/10-fastapi)
+__pycache__/
+*.pyc
+.pytest_cache/

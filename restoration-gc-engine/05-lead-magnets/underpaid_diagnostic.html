@@ -1,0 +1,56 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Is My Claim Underpaid? Diagnostic | Restoration GC</title>
+<style>body{font-family:system-ui,Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#111}
+h1{font-size:1.5rem}label{display:block;margin:6px 0}
+button{background:#0b5;color:#fff;border:0;padding:12px 18px;border-radius:8px;font-size:1rem;cursor:pointer}
+.disc{font-size:.8rem;color:#555;margin-top:16px;border-top:1px solid #ddd;padding-top:12px}
+.q{background:#f4f4f4;border-radius:8px;padding:10px;margin:6px 0}
+input[type=text],input[type=email]{width:100%;padding:10px;margin:4px 0;border:1px solid #ccc;border-radius:6px}</style></head>
+<body>
+<h1>Is My Commercial Roof Claim Underpaid? — Self-Diagnostic</h1>
+<p><b>Important:</b> this tool does not tell you whether your claim is underpaid, and it is not an appraisal, adjustment, or legal opinion. It generates a personalized list of <i>questions to ask your insurer, your own independent public adjuster, or your attorney</i>, based on common commercial roof-scope gaps.</p>
+<form id="f">
+ <div class="q"><label><input type="checkbox" name="a" value="code_upgrade"> My estimate does not mention code-upgrade / ordinance-and-law coverage</label>
+ <label><input type="checkbox" name="a" value="tear_off"> My estimate does not include full tear-off of all roof layers</label>
+ <label><input type="checkbox" name="a" value="flashing"> My estimate does not include flashing, edge metal, or coping replacement</label>
+ <label><input type="checkbox" name="a" value="hvac"> My estimate does not account for rooftop HVAC curb/equipment disturbance</label>
+ <label><input type="checkbox" name="a" value="depreciation"> I don't understand how recoverable depreciation was calculated</label></div>
+ <input type="text" name="full_name" placeholder="Full name" required>
+ <input type="email" name="email" placeholder="Work email" required>
+ <input type="text" name="company" placeholder="Company / property">
+ <select name="state" required><option value="">State</option><option>TX</option><option>IL</option><option>FL</option><option>OK</option><option value="OTHER">Other</option></select>
+ <label><input type="checkbox" id="ec" required> I agree Restoration GC may email me educational information. I can unsubscribe anytime. (Restoration GC, 701 Brazos St, Austin, TX 78701)</label>
+ <label><input type="checkbox" id="vc"> I agree Restoration GC may call/text me, <b>including with an AI-generated voice</b>, at the number I provide, using automated technology. Consent is not a condition of purchase. Msg/data rates may apply.</label>
+ <input type="text" name="phone" placeholder="Phone (only if you check the box above)">
+ <button type="submit">Get my question list</button>
+</form>
+<div id="result"></div>
+<div class="disc" id="disc">Restoration GC is a licensed general contractor, not a public insurance adjuster; we do not adjust claims, appraise damage value, or provide legal advice. For a formal claim evaluation, consult a licensed public adjuster or attorney.</div>
+<script>
+const HS_PORTAL="246969128",HS_FORM="__HS_FORM_GUID_UNDERPAID__",SB_URL="https://bccpaguzuowwgokxgsjh.supabase.co",SB_ANON="sb_publishable_jrNisMpe0JdAdODEuFrsYQ_wTUY8lBp";
+const QUESTIONS={
+ code_upgrade:"Ask your insurer: does my policy include ordinance-or-law / code-upgrade coverage, and was it applied to this estimate?",
+ tear_off:"Ask your insurer: does the estimate include full tear-off of all existing roof layers, or only the top layer?",
+ flashing:"Ask your insurer: were flashing, edge metal, and coping included in the scope, or only field membrane?",
+ hvac:"Ask your insurer: does the estimate account for disturbance to rooftop HVAC curbs and equipment during the repair?",
+ depreciation:"Ask your insurer: what depreciation schedule and useful-life assumption were used, and how do I recover it?"
+};
+const disc={TX:"Texas law requires you to pay your deductible (Tex. Ins. Code §707.002).",FL:"In Florida, notice of a new/reopened claim is generally barred after 1 year from date of loss (§627.70132).",OK:"Oklahoma law (59 O.S. §1151.30): a roofing contractor may not pay any part of your deductible.",IL:"Illinois law (215 ILCS 5/155.51) prohibits waiving or inflating deductibles.",OTHER:""};
+function utm(k){return new URLSearchParams(location.search).get(k)||"";}
+document.getElementById('f').addEventListener('submit',async e=>{e.preventDefault();
+ const fd=new FormData(e.target),st=fd.get('state'),picked=[...document.querySelectorAll('[name=a]:checked')].map(c=>c.value);
+ const list=picked.map(k=>`<li>${QUESTIONS[k]}</li>`).join('')||'<li>No gaps flagged from the list above — if you still have concerns, an independent public adjuster or attorney can review your full estimate.</li>';
+ document.getElementById('result').innerHTML=`<h2>Questions to bring to your insurer</h2><ul>${list}</ul>`;
+ document.getElementById('disc').textContent+=" "+(disc[st]||"");
+ const email=fd.get('email'),phone=fd.get('phone'),ec=document.getElementById('ec').checked,vc=document.getElementById('vc').checked;
+ // HubSpot Forms v3 (best-effort - a bad/placeholder HS_FORM or subscriptionTypeId must never block the Supabase writes below, which are this system's source of truth)
+ try { await fetch(`https://api.hsforms.com/submissions/v3/integration/submit/${HS_PORTAL}/${HS_FORM}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   fields:[{name:'email',value:email},{name:'firstname',value:fd.get('full_name')},{name:'company',value:fd.get('company')||''},{name:'phone',value:phone||''},{name:'rgc_primary_state',value:st},{name:'rgc_lead_magnet',value:'underpaid'}],
+   context:{pageUri:location.href,pageName:'Underpaid Diagnostic'},
+   legalConsentOptions:{consent:{consentToProcess:true,text:'I agree to allow Restoration GC to store and process my data.',communications:[{value:ec,subscriptionTypeId:'__EMAIL_SUB_ID__',text:'Email educational information'}]}}})}); } catch(err) { console.warn('HubSpot sync failed (check HS_FORM/EMAIL_SUB_ID placeholders):', err); }
+ const h={'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+SB_ANON};
+ await fetch(SB_URL+'/rest/v1/lead_magnet_submissions',{method:'POST',headers:h,body:JSON.stringify({magnet_slug:'underpaid',email,full_name:fd.get('full_name'),phone,company:fd.get('company'),state:st,answers:{gaps:picked},utm_source:utm('utm_source'),utm_medium:utm('utm_medium'),utm_campaign:utm('utm_campaign'),utm_content:utm('utm_content'),source_url:location.href})});
+ // ai_voice_disclosed marks whether the AI-voice disclosure text was shown on this page (always true here, since the checkbox above always carries it) -- distinct from consent_given (did the visitor check the box). Both objects need identical keys or PostgREST rejects the whole batch (PGRST102), and the DB requires ai_voice_disclosed=true on every channel='voice' row regardless of consent_given.
+ await fetch(SB_URL+'/rest/v1/consent_records',{method:'POST',headers:h,body:JSON.stringify([{email,phone,channel:'email',consent_given:ec,ai_voice_disclosed:false,consent_text:'Email educational info',source_url:location.href},{email,phone,channel:'voice',consent_given:vc,ai_voice_disclosed:true,consent_text:'AI-voice/automated call+text consent',source_url:location.href}])});
+});
+</script></body></html>

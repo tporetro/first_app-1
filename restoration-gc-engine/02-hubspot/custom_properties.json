@@ -1,0 +1,16 @@
+[
+ {"name":"rgc_owner_type","label":"Owner Type","type":"enumeration","fieldType":"select","groupName":"restorationgc","options":[
+   {"label":"Building Owner","value":"building_owner"},{"label":"Asset Manager","value":"asset_manager"},{"label":"Property Manager","value":"property_manager"},{"label":"REIT / Portfolio","value":"reit_portfolio"},{"label":"NN-Lease Owner","value":"nn_lease_owner"},{"label":"Religious / Nonprofit","value":"religious_nonprofit"},{"label":"Industrial","value":"industrial"},{"label":"Shopping Center","value":"shopping_center"},{"label":"Broker","value":"broker"},{"label":"Public Adjuster","value":"public_adjuster"},{"label":"Attorney","value":"attorney"}]},
+ {"name":"rgc_primary_state","label":"Primary State","type":"enumeration","fieldType":"select","groupName":"restorationgc","options":[{"label":"TX","value":"TX"},{"label":"IL","value":"IL"},{"label":"FL","value":"FL"},{"label":"OK","value":"OK"},{"label":"Other","value":"OTHER"}]},
+ {"name":"rgc_lead_magnet","label":"Lead Magnet Source","type":"enumeration","fieldType":"select","groupName":"restorationgc","options":[{"label":"Roof-Claim Readiness Scorecard","value":"scorecard"},{"label":"Claim Deadline Checker","value":"deadline_checker"},{"label":"Is My Claim Underpaid?","value":"underpaid"},{"label":"Roof-Life ROI Calculator","value":"roi"},{"label":"Free Hail-Impact Report","value":"hail_report"}]},
+ {"name":"rgc_behavior_score","label":"Behavior Score","type":"number","fieldType":"number","groupName":"restorationgc"},
+ {"name":"rgc_fit_score","label":"Fit Score","type":"number","fieldType":"number","groupName":"restorationgc"},
+ {"name":"rgc_total_score","label":"Total Lead Score","type":"number","fieldType":"number","groupName":"restorationgc"},
+ {"name":"rgc_email_consent","label":"Email Consent","type":"enumeration","fieldType":"booleancheckbox","groupName":"restorationgc","options":[{"label":"Yes","value":"true"},{"label":"No","value":"false"}]},
+ {"name":"rgc_voice_consent","label":"Voice/AI Consent","type":"enumeration","fieldType":"booleancheckbox","groupName":"restorationgc","options":[{"label":"Yes","value":"true"},{"label":"No","value":"false"}]},
+ {"name":"rgc_consent_ts","label":"Consent Timestamp","type":"datetime","fieldType":"date","groupName":"restorationgc"},
+ {"name":"rgc_storm_event_id","label":"Storm Event ID","type":"string","fieldType":"text","groupName":"restorationgc"},
+ {"name":"rgc_hail_score","label":"Hail Impact Score","type":"number","fieldType":"number","groupName":"restorationgc"},
+ {"name":"rgc_supabase_id","label":"Supabase Owner ID","type":"string","fieldType":"text","groupName":"restorationgc"},
+ {"name":"rgc_portfolio_id","label":"Supabase Portfolio ID","type":"string","fieldType":"text","groupName":"restorationgc"}
+]

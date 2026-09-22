@@ -1,0 +1,48 @@
+# FastAPI Webhook Backend
+
+Implements the 3 endpoints specified in `03-n8n/fastapi_webhook_contract.md`, plus the LinkedIn webhook validation handshake. This is what runs at `api.restorationgc.net` in the architecture diagram.
+
+## Endpoints
+
+- **`POST /webhooks/storm-alert`** — HMAC-verified (`X-RGC-Signature`). Validates the storm-event payload, then forwards it as-is to n8n's W1 webhook (`N8N_STORM_ALERT_WEBHOOK_URL`) and relays W1's response. If `N8N_STORM_ALERT_WEBHOOK_URL` isn't set, it validates and returns `{"status": "validated_only", ...}` without forwarding — useful for standing this service up and testing it before n8n is wired in.
+- **`GET /approve`** — the one-tap link from the W6 daily digest email (`?token=<uuid>&d=approve|edit|reject`). Looks up the `approval_queue` row by `one_tap_token`, and is idempotent: if a decision is already recorded, it reports that back rather than overwriting it. Returns a small HTML confirmation page since it's meant to be opened from an email link, not called programmatically.
+- **`POST /webhooks/retell-status`** — HMAC-verified. Logs a completed voice call as an `attribution_events` row (`event_name = voice_connect`), but only when `consent_verified` AND `ai_disclosed` are both true — a bad or misconfigured Retell payload can't backdoor a voice touch into attribution without the same consent/disclosure gate W4 and the `chk_consent_disclosure` DB constraint already enforce.
+- **`GET /webhooks/linkedin`** — the LinkedIn Community Management API's webhook validation handshake (`?challengeCode=...`). Returns `{"challengeCode": ..., "challengeResponse": hmac_sha256(LINKEDIN_CLIENT_SECRET, challengeCode)}`. LinkedIn calls this once when the webhook URL is registered and again every 2 hours to re-validate it; 3 consecutive failures gets the webhook blocked. See `06-linkedin/community_api_application.md`.
+- **`GET /healthz`** — plain liveness check for whatever's running this (uptime monitor, container orchestrator).
+
+## Environment Variables
+
+| Var | Required | Notes |
+|---|---|---|
+| `FASTAPI_HMAC_SECRET` | Yes | Shared secret for verifying `X-RGC-Signature` on both webhook POSTs. Must match whatever your storm-data provider and Retell are configured to sign with. |
+| `SUPABASE_URL` | Yes | e.g. `https://bccpaguzuowwgokxgsjh.supabase.co` |
+| `SUPABASE_SERVICE_KEY` | Yes | `service_role` key — bypasses RLS. Keep this server-side only, same rule as everywhere else in this build. |
+| `N8N_STORM_ALERT_WEBHOOK_URL` | No | Full URL to n8n's W1 webhook. Omit to run this service standalone before n8n is set up. |
+| `LINKEDIN_CLIENT_SECRET` | Yes (for `/webhooks/linkedin`) | The app's Client Secret from the LinkedIn Developer Portal's "Auth" tab — only exists once the app itself has been created there. Used only to compute the challenge response; never sent anywhere. |
+
+Talks to Supabase via its REST API (PostgREST) with the service-role key, not a direct Postgres connection — the only runtime dependency beyond FastAPI itself is `httpx`.
+
+## Run Locally
+
+```
+pip install -r requirements.txt
+export FASTAPI_HMAC_SECRET=... SUPABASE_URL=... SUPABASE_SERVICE_KEY=...
+uvicorn main:app --reload
+```
+
+## Test
+
+```
+pip install -r requirements.txt pytest respx
+pytest test_main.py -v
+```
+
+18 tests cover: HMAC verification (missing/invalid/valid signature) on both webhook endpoints, payload validation, forwarding to n8n plus the downstream-unreachable case, `/approve`'s unknown-token/success/already-decided/bad-decision-value/Supabase-unreachable paths, the retell-status consent/disclosure gate plus its own Supabase-unreachable path, and the LinkedIn challenge-handshake response (correct HMAC + missing-param validation). All were run against this exact code before it was committed — not just read over.
+
+**Also run directly as a live process** (real `uvicorn` + real HTTP requests, not just the in-process `TestClient` the test suite uses) to catch anything test mocking might paper over. That caught a real bug: `/approve` and `/webhooks/retell-status` only turned an HTTP *error status* from Supabase into a clean `502` — a connection-level failure (Supabase unreachable, DNS failure, etc.) fell through uncaught and surfaced as a raw, unhelpful `500`. Since `/approve` is opened directly from an email link by a human, that would have been a blank error page instead of something actionable. Fixed by wrapping both calls in `try/except httpx.HTTPError`, matching the pattern the n8n-forwarding call in `/webhooks/storm-alert` already used; verified live against a real unreachable URL before and after the fix, then covered with 2 new regression tests.
+
+## Deploying
+
+Any ASGI host works (this build was written generically, not tied to a specific PaaS): Railway, Fly.io, a container behind your own reverse proxy, etc. Point your storm-data provider's webhook and Retell's status-callback webhook at this service's `/webhooks/*` URLs, each configured to sign requests with `FASTAPI_HMAC_SECRET`. This session has no hosting/deploy connector attached, so provisioning wherever you run this is on you — the code and tests are the deliverable here.
+
+A `Dockerfile` is included for any container-based host (Fly.io, Railway, a bare container behind your reverse proxy): `docker build -t rgc-fastapi . && docker run -p 8000:8000 --env-file .env rgc-fastapi`. **Note:** this sandbox has no Docker daemon available, so the image itself was hand-reviewed but not build-tested here — build and run it yourself before relying on it. The application code it wraps *was* verified as a real running process (see above), independent of the container.

@@ -1,0 +1,35 @@
+create index if not exists idx_storm_events_swath on public.storm_events using gist (swath);
+create index if not exists idx_storm_events_ts on public.storm_events (event_ts desc);
+create index if not exists idx_properties_geom on public.properties using gist (geom);
+create index if not exists idx_properties_centroid on public.properties using gist (centroid);
+create index if not exists idx_properties_state on public.properties (state);
+create index if not exists idx_properties_portfolio on public.properties (portfolio_id);
+create index if not exists idx_portfolios_owner on public.portfolios (owner_id);
+create index if not exists idx_owners_email on public.owners (email);
+create index if not exists idx_owners_hs on public.owners (hubspot_contact_id);
+create index if not exists idx_owners_type_state on public.owners (owner_type, state);
+create index if not exists idx_rules_state_active on public.compliance_rules (scope_state, active);
+create index if not exists idx_drafts_status on public.content_drafts (compliance_status);
+create index if not exists idx_drafts_scheduled_date on public.content_drafts (scheduled_date);
+create index if not exists idx_drafts_owner on public.content_drafts (owner_id);
+create index if not exists idx_queue_decision on public.approval_queue (decision);
+create index if not exists idx_queue_token on public.approval_queue (one_tap_token);
+create index if not exists idx_queue_dispatched on public.approval_queue (dispatched_at);
+create index if not exists idx_attr_hs on public.attribution_events (hubspot_contact_id);
+create index if not exists idx_attr_synced on public.attribution_events (synced_to_hubspot);
+create index if not exists idx_attr_campaign on public.attribution_events (campaign_id);
+create index if not exists idx_lms_email on public.lead_magnet_submissions (email);
+create index if not exists idx_lms_synced on public.lead_magnet_submissions (hubspot_synced);
+create index if not exists idx_consent_owner on public.consent_records (owner_id);
+create index if not exists idx_consent_phone on public.consent_records (phone);
+create index if not exists idx_li_metrics_date on public.linkedin_metrics (metric_date desc);
+-- FK-covering indexes (flagged by the Supabase performance advisor if omitted)
+create index if not exists idx_approval_queue_draft on public.approval_queue (content_draft_id);
+create index if not exists idx_attr_owner on public.attribution_events (owner_id);
+create index if not exists idx_drafts_storm_event on public.content_drafts (storm_event_id);
+create index if not exists idx_lms_owner on public.lead_magnet_submissions (owner_id);
+create index if not exists idx_owners_property on public.owners (property_id);
+create index if not exists idx_properties_storm_event on public.properties (storm_event_id);
+-- Constraints
+alter table public.storm_events add constraint chk_hail_nonneg check (max_hail_size_in is null or max_hail_size_in >= 0);
+alter table public.consent_records add constraint chk_consent_disclosure check (channel <> 'voice' or ai_voice_disclosed = true);
