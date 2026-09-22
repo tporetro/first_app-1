@@ -142,34 +142,42 @@ h1{{font-size:1.3rem}}</style></head>
 
 @app.get("/approve", response_class=Response)
 async def approve(token: str, d: Decision):
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        lookup = await client.get(
-            f"{_env('SUPABASE_URL')}/rest/v1/approval_queue",
-            params={"one_tap_token": f"eq.{token}", "select": "id,decision"},
-            headers=supabase_headers(),
-        )
-        if lookup.status_code >= 400:
-            raise HTTPException(status_code=502, detail="could not reach Supabase")
-        rows = lookup.json()
-        if not rows:
-            raise HTTPException(status_code=404, detail="unknown or expired approval token")
-
-        row = rows[0]
-        if row["decision"] is not None:
-            html = APPROVE_CONFIRMATION_HTML.format(
-                message=f"This item was already marked '{row['decision']}' — no change made."
+    # This is opened directly from an email link by a human, not called programmatically -
+    # a raw 500 on a Supabase outage/misconfiguration would show them an unhelpful blank
+    # error page, so network-level failures (not just error status codes) get the same
+    # clean 502 treatment as an HTTP-level error.
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            lookup = await client.get(
+                f"{_env('SUPABASE_URL')}/rest/v1/approval_queue",
+                params={"one_tap_token": f"eq.{token}", "select": "id,decision"},
+                headers=supabase_headers(),
             )
-            return Response(content=html, media_type="text/html")
+            if lookup.status_code >= 400:
+                raise HTTPException(status_code=502, detail="could not reach Supabase")
+            rows = lookup.json()
+            if not rows:
+                raise HTTPException(status_code=404, detail="unknown or expired approval token")
 
-        patch = await client.patch(
-            f"{_env('SUPABASE_URL')}/rest/v1/approval_queue",
-            params={"id": f"eq.{row['id']}"},
-            headers=supabase_headers(),
-            json={"decision": d, "decision_ts": datetime.now(timezone.utc).isoformat()},
-        )
-        if patch.status_code >= 400:
-            logger.error("failed to record approval decision: %s", patch.text)
-            raise HTTPException(status_code=502, detail="could not record decision")
+            row = rows[0]
+            if row["decision"] is not None:
+                html = APPROVE_CONFIRMATION_HTML.format(
+                    message=f"This item was already marked '{row['decision']}' — no change made."
+                )
+                return Response(content=html, media_type="text/html")
+
+            patch = await client.patch(
+                f"{_env('SUPABASE_URL')}/rest/v1/approval_queue",
+                params={"id": f"eq.{row['id']}"},
+                headers=supabase_headers(),
+                json={"decision": d, "decision_ts": datetime.now(timezone.utc).isoformat()},
+            )
+            if patch.status_code >= 400:
+                logger.error("failed to record approval decision: %s", patch.text)
+                raise HTTPException(status_code=502, detail="could not record decision")
+    except httpx.HTTPError as e:
+        logger.error("could not reach Supabase for /approve: %s", e)
+        raise HTTPException(status_code=502, detail="could not reach Supabase") from e
 
     html = APPROVE_CONFIRMATION_HTML.format(message=f"Recorded: {d}")
     return Response(content=html, media_type="text/html")
@@ -209,12 +217,16 @@ async def retell_status(request: Request, x_rgc_signature: str | None = Header(d
         "touch_channel": "voice",
         "occurred_at": datetime.now(timezone.utc).isoformat(),
     }
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.post(
-            f"{_env('SUPABASE_URL')}/rest/v1/attribution_events",
-            headers={**supabase_headers(), "Prefer": "return=minimal"},
-            json=event,
-        )
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{_env('SUPABASE_URL')}/rest/v1/attribution_events",
+                headers={**supabase_headers(), "Prefer": "return=minimal"},
+                json=event,
+            )
+    except httpx.HTTPError as e:
+        logger.error("could not reach Supabase for call %s: %s", payload.call_id, e)
+        raise HTTPException(status_code=502, detail="could not log attribution event") from e
     if resp.status_code >= 400:
         logger.error("failed to log attribution_event for call %s: %s", payload.call_id, resp.text)
         raise HTTPException(status_code=502, detail="could not log attribution event")

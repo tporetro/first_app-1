@@ -98,6 +98,16 @@ def test_approve_unknown_token():
 
 
 @respx.mock
+def test_approve_supabase_unreachable():
+    # A connection-level failure (not an HTTP error status) must still surface as a clean
+    # 502, not an unhandled 500 -- found by actually running this against a live server and
+    # an unreachable Supabase URL, not by reading the code.
+    respx.get("https://example.supabase.co/rest/v1/approval_queue").mock(side_effect=httpx.ConnectError("refused"))
+    r = client.get("/approve", params={"token": "tok1", "d": "approve"})
+    assert r.status_code == 502, r.text
+
+
+@respx.mock
 def test_approve_success():
     respx.get("https://example.supabase.co/rest/v1/approval_queue").mock(
         return_value=httpx.Response(200, json=[{"id": "row-1", "decision": None}])
@@ -158,6 +168,16 @@ def test_retell_status_logged_with_consent():
     sent_body = json.loads(post_route.calls.last.request.content)
     assert sent_body["event_name"] == "voice_connect"
     assert sent_body["touch_channel"] == "voice"
+
+
+@respx.mock
+def test_retell_status_supabase_unreachable():
+    respx.post("https://example.supabase.co/rest/v1/attribution_events").mock(side_effect=httpx.ConnectError("refused"))
+    body = json.dumps(
+        {"call_id": "c4", "outcome": "connected", "consent_verified": True, "ai_disclosed": True}
+    ).encode()
+    r = client.post("/webhooks/retell-status", content=body, headers={"X-RGC-Signature": sign(body)})
+    assert r.status_code == 502, r.text
 
 
 def test_retell_status_bad_signature():
