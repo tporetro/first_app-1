@@ -1,1 +1,1 @@
-{"version":"2.1.9","results":[[":marketPipeline.test.ts",{"duration":17.080444999999997,"failed":false}]]}
+{"version":"2.1.9","results":[[":marketPipeline.test.ts",{"duration":16.177032000000054,"failed":false}],[":xweatherAdapter.test.ts",{"duration":10.270083,"failed":false}]]}
