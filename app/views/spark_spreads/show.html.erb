@@ -1,0 +1,77 @@
+<h1>Spark spread hedge calculator</h1>
+
+<p>
+  Spark spread = power price &minus; (heat rate &times; gas price).
+  Defaults reproduce the 1,000 MWh worked example. Figures are illustrative.
+</p>
+
+<% if flash[:error] %>
+  <p class="error"><%= flash[:error] %></p>
+<% end %>
+
+<%= form_tag spark_spread_path, method: :get do %>
+  <fieldset>
+    <legend>Plant and hedges</legend>
+    <% [[:volume_mwh,    "Expected output (MWh)"],
+        [:heat_rate,     "Heat rate (MMBtu/MWh)"],
+        [:vom,           "Variable O&M ($/MWh)"],
+        [:power_futures, "Sell power futures at ($/MWh)"],
+        [:gas_futures,   "Buy gas futures at ($/MMBtu)"],
+        [:put_strike,    "Power put strike ($/MWh)"],
+        [:put_premium,   "Put premium ($/MWh)"],
+        [:call_strike,   "Gas call strike ($/MMBtu)"],
+        [:call_premium,  "Call premium ($/MMBtu)"]].each do |field, label| %>
+      <p>
+        <%= label_tag field, label %>
+        <%= number_field_tag field, @hedge.send(field), step: "any" %>
+      </p>
+    <% end %>
+  </fieldset>
+
+  <fieldset>
+    <legend>Custom scenario (optional)</legend>
+    <p><%= label_tag :scenario_power, "Power ($/MWh)" %> <%= number_field_tag :scenario_power, params[:scenario_power], step: "any" %></p>
+    <p><%= label_tag :scenario_gas, "Gas ($/MMBtu)" %> <%= number_field_tag :scenario_gas, params[:scenario_gas], step: "any" %></p>
+    <p><%= label_tag :scenario_output, "Output (% of expected)" %> <%= number_field_tag :scenario_output, params[:scenario_output], step: "any" %></p>
+  </fieldset>
+
+  <%= submit_tag "Calculate", name: nil %>
+<% end %>
+
+<h2>Summary</h2>
+<ul>
+  <li>Gas to hedge: <%= number_with_delimiter(@hedge.gas_volume_mmbtu.round) %> MMBtu</li>
+  <li>Spark spread at futures prices: <%= number_to_currency(@hedge.spark_spread) %>/MWh</li>
+  <li>Futures-locked margin: <%= number_to_currency(@hedge.locked_margin, precision: 0) %></li>
+  <li>Options premium: <%= number_to_currency(@hedge.premium, precision: 0) %></li>
+  <li>Options floor (worst case, full output): <%= number_to_currency(@hedge.options_floor, precision: 0) %></li>
+</ul>
+
+<h2>Scenarios</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Scenario</th><th>Power</th><th>Gas</th><th>Output</th>
+      <th>Unhedged</th><th>Futures hedge</th><th>Put + call hedge</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @results.each do |r| %>
+      <tr>
+        <td><%= r[:scenario].name %></td>
+        <td><%= number_to_currency(r[:scenario].power) %></td>
+        <td><%= number_to_currency(r[:scenario].gas) %></td>
+        <td><%= number_to_percentage(r[:scenario].output_pct, precision: 0) %></td>
+        <td><%= number_to_currency(r[:unhedged], precision: 0) %></td>
+        <td><%= number_to_currency(r[:futures], precision: 0) %></td>
+        <td><%= number_to_currency(r[:options], precision: 0) %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+
+<p>
+  Hedges are sized to expected output. When the plant runs below 100%, the
+  hedges no longer match the physical position (volume risk). The trip row
+  shows a short power future losing money when the unit fails during a spike.
+</p>

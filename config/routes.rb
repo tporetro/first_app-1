@@ -1,4 +1,6 @@
 FirstApp::Application.routes.draw do
+  get 'spark_spread' => 'spark_spreads#show', as: :spark_spread
+
   # The priority is based upon order of creation: first created -> highest priority.
   # See how all your routes lay out with "rake routes".
 
