@@ -52,3 +52,12 @@ is a drop-in replacement for its original.
 
     npx vitest run stormsignal/server        # 22 tests
     python -m pytest stormsignal             # 8 tests (needs numpy, pandas)
+
+## Operating dates
+
+`server/dataSources.ts` now dates MISO intervals by their EST operating day
+instead of the UTC date, and labels them `Etc/GMT+5` instead of
+`America/Chicago`. New ingests also correct rows they touch. Run
+`fix-miso-operating-dates.sql` once to repair the rest. Load rows written by
+the old pipeline are attached to intervals shifted by 5 hours, so re-ingest
+them from the raw bodies in `source_objects`; the SQL does not fix that.

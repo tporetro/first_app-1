@@ -3,7 +3,7 @@ import { gunzipSync } from "node:zlib";
 import { and, desc, eq } from "drizzle-orm";
 import { ingestionRuns, loadObservations, marketIntervals, priceObservations, sourceObjects, stormEvents } from "../drizzle/schema";
 import { getDb } from "./db";
-import { normalizeMisoLoad, normalizeMisoPricing, normalizeNoaaStormCsv } from "./marketPipeline";
+import { misoOperatingDate, normalizeMisoLoad, normalizeMisoPricing, normalizeNoaaStormCsv } from "./marketPipeline";
 
 const ADAPTER_VERSION = "1.1.0";
 const REQUEST_TIMEOUT_MS = 45_000;
@@ -76,17 +76,30 @@ export async function getSourceStatuses(): Promise<SourceStatus[]> {
   }));
 }
 
+// MISO runs on Eastern Standard Time all year. "Etc/GMT+5" is the IANA name
+// for fixed UTC-5 (the sign is inverted by convention).
+const MISO_TIMEZONE = "Etc/GMT+5";
+
+/** A market_intervals row for a MISO interval, dated by its EST operating day. */
+function misoIntervalValues(intervalStartUtc: Date, intervalEndUtc: Date) {
+  return { market: "MISO", operatingDate: misoOperatingDate(intervalStartUtc), intervalStartUtc, intervalEndUtc, timezone: MISO_TIMEZONE };
+}
+
 async function persistNormalizedMiso(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, key: string, body: string, sourceObjectId: number, availableAt: Date) {
   if (key === "miso_pricing") {
     for (const row of normalizeMisoPricing(body, sourceObjectId, availableAt)) {
-      await db.insert(marketIntervals).values({ market: "MISO", operatingDate: row.intervalStartUtc.toISOString().slice(0, 10), intervalStartUtc: row.intervalStartUtc, intervalEndUtc: row.intervalEndUtc, timezone: "America/Chicago" }).onDuplicateKeyUpdate({ set: { intervalEndUtc: row.intervalEndUtc } });
+      const values = misoIntervalValues(row.intervalStartUtc, row.intervalEndUtc);
+      // Also correct the date and zone on rows written before this fix.
+      await db.insert(marketIntervals).values(values).onDuplicateKeyUpdate({ set: { intervalEndUtc: values.intervalEndUtc, operatingDate: values.operatingDate, timezone: values.timezone } });
       const interval = await db.select({ id: marketIntervals.id }).from(marketIntervals).where(and(eq(marketIntervals.market, "MISO"), eq(marketIntervals.intervalStartUtc, row.intervalStartUtc))).limit(1);
       if (interval[0]) await db.insert(priceObservations).values({ sourceObjectId, marketIntervalId: interval[0].id, locationId: row.locationId, locationType: row.locationType, product: row.product, price: row.price, availableAt: row.availableAt }).onDuplicateKeyUpdate({ set: { price: row.price, availableAt: row.availableAt } });
     }
   }
   if (key === "miso_load_generation") {
     for (const row of normalizeMisoLoad(body, sourceObjectId, availableAt)) {
-      await db.insert(marketIntervals).values({ market: "MISO", operatingDate: row.intervalStartUtc.toISOString().slice(0, 10), intervalStartUtc: row.intervalStartUtc, intervalEndUtc: row.intervalEndUtc, timezone: "America/Chicago" }).onDuplicateKeyUpdate({ set: { intervalEndUtc: row.intervalEndUtc } });
+      const values = misoIntervalValues(row.intervalStartUtc, row.intervalEndUtc);
+      // Also correct the date and zone on rows written before this fix.
+      await db.insert(marketIntervals).values(values).onDuplicateKeyUpdate({ set: { intervalEndUtc: values.intervalEndUtc, operatingDate: values.operatingDate, timezone: values.timezone } });
       const interval = await db.select({ id: marketIntervals.id }).from(marketIntervals).where(and(eq(marketIntervals.market, "MISO"), eq(marketIntervals.intervalStartUtc, row.intervalStartUtc))).limit(1);
       if (interval[0]) await db.insert(loadObservations).values({ sourceObjectId, marketIntervalId: interval[0].id, areaId: row.areaId, product: row.product, megawatts: row.megawatts, availableAt: row.availableAt });
     }
