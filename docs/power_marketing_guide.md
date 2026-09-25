@@ -288,7 +288,7 @@ v[t, 1] = np.where(stay,
 
 Why this differs from setting `v[t] = np.maximum(...)` of the fitted values:
 
-- **Bias.** Taking the maximum of noisy regression estimates adds an upward bias at each step, and it compounds backward through thousands of hours. Standard Longstaff–Schwartz uses the fit only for the decision and keeps realized cash flows.
+- **Bias.** Carrying fitted values backward replaces each path's realized value with a smoothed estimate, and the error compounds over every hour stepped back. Its direction isn't fixed. In one near-the-money 24-hour test it understated value by about 5% (9,635 vs. 10,127 out of sample), and in other setups it can overstate. The result is therefore neither a lower nor an upper bound. Standard Longstaff–Schwartz uses the fit only for the decision and keeps realized cash flows.
 - **Out-of-sample pricing.** Estimate the policy on one set of paths and value it on a fresh set. The result is then a lower bound, because any feasible policy is. Pair it with a dual (upper-bound) estimate if the gap matters.
 - **Minimum up/down times.** A two-state `{off, on}` model can't enforce them. Extend the state to `(status, hours in status)`, or model min-run as committed blocks.
 - **Operating margin.** Set it to the best feasible output level given the heat-rate curve: `max over q in [q_min, q_max] of q·P − fuel(q)·G − VOM·q`. When prices are below cost, "stay on" should still earn the (negative) margin at minimum generation, not zero.
