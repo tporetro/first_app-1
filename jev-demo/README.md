@@ -25,3 +25,16 @@ To try a different state, pass it as an argument:
 ```sh
 node --env-file=.env index.mjs "The customer requested a refund, but the agent has not processed it."
 ```
+
+## Measured results (2026-09-26)
+
+Real output from `index.mjs` via Vercel AI Gateway. Elapsed time is measured by the
+script and includes the network round trip. Cost is what the gateway reported.
+
+| State | Probability a refund was issued | Elapsed | Cost (USD) |
+|---|---|---|---|
+| The support agent issued a full refund to the customer. | 0.99 | 910 ms | $0.000011844 |
+| The customer requested a refund, but the agent has not processed it. | 0.04 | 741 ms | $0.00001197 |
+
+If you see `GatewayRateLimitError: The upstream provider is currently experiencing high demand`,
+wait a minute and rerun. It happened often during testing and failed calls were not billed.
