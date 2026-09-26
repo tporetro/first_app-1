@@ -18,7 +18,7 @@ export function requireKey() {
 // retry here instead of letting the SDK hammer it.
 const BACKOFF_MS = [5_000, 10_000, 20_000, 40_000, 60_000, 60_000];
 
-export async function jev(state, questions) {
+export async function jev(state, questions, backoff = BACKOFF_MS) {
   for (let attempt = 0; ; attempt++) {
     const started = performance.now();
     try {
@@ -35,8 +35,8 @@ export async function jev(state, questions) {
     } catch (error) {
       const rateLimited =
         error.statusCode === 429 || /RateLimit|high demand/i.test(`${error.name} ${error.message}`);
-      if (rateLimited && attempt < BACKOFF_MS.length) {
-        await sleep(BACKOFF_MS[attempt] + Math.random() * 1000);
+      if (rateLimited && attempt < backoff.length) {
+        await sleep(backoff[attempt] + Math.random() * 1000);
         continue;
       }
       return { ok: false, error: `${error.name}: ${error.message}`, attempts: attempt + 1 };
@@ -44,8 +44,17 @@ export async function jev(state, questions) {
   }
 }
 
-// Run fn over items with at most `limit` in flight.
-export async function pool(items, limit, fn) {
+// Run fn over items with at most `limit` in flight. With minGapMs > 0, run one
+// at a time and start each call at least minGapMs after the previous one.
+export async function pool(items, limit, fn, minGapMs = 0) {
+  if (minGapMs > 0) {
+    for (let i = 0; i < items.length; i++) {
+      const started = Date.now();
+      await fn(items[i], i);
+      if (i < items.length - 1) await sleep(Math.max(0, started + minGapMs - Date.now()));
+    }
+    return;
+  }
   let next = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
     while (next < items.length) {

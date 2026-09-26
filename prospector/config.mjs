@@ -78,5 +78,15 @@ export const MESSAGE_QUESTIONS = {
 
 export const FLAG_IF = ({ fit }) => fit < 0.5;
 
+// Only send Jev the posts that explicitly ask for a pro (referral, "know a good...",
+// "who do you use..."). Cuts calls ~10x; set to null to score every pre-filtered post.
+export const ASK_FOR_PRO =
+  /\b(know (a|of|any) good|recommend(ation|ations)?\s+(for|on)|any recommendations|who (do|would|should) (you|i) (use|call|hire)|looking for (a|an) (good|reliable|roofer|contractor|company)|need (a|an) (roofer|contractor|roofing)|(roofer|roofing (company|contractor)|contractor)s? (in|near|around)\b|hire (a|someone)|find (a|someone)|recommend (a|someone|any)|referral|who fixes|who (can|could) (fix|repair|look))/i;
+
+// Vercel currently allows this account ONE successful Jev call per 5 minutes
+// (measured 2026-09-26). While that holds, pace calls instead of bursting into 429s.
+// Set to 0 once the limit is raised; CONCURRENCY then applies.
+export const MIN_MS_BETWEEN_CALLS = 300_000;
+
 export const CONCURRENCY = 3;
 export const MAX_STATE_CHARS = 8000;
