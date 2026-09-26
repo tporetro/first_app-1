@@ -36,5 +36,13 @@ script and includes the network round trip. Cost is what the gateway reported.
 | The support agent issued a full refund to the customer. | 0.99 | 910 ms | $0.000011844 |
 | The customer requested a refund, but the agent has not processed it. | 0.04 | 741 ms | $0.00001197 |
 
-If you see `GatewayRateLimitError: The upstream provider is currently experiencing high demand`,
-wait a minute and rerun. It happened often during testing and failed calls were not billed.
+Rerun with the new key (19:28 and 19:33 UTC): 0.99 in 597 ms and 0.04 in 762 ms, at the same costs.
+
+### If you see `GatewayRateLimitError` (HTTP 429)
+
+The message says "The upstream provider is currently experiencing high demand", but Vercel is
+the one refusing (`providerAttemptCount: 0`). On AI Gateway's free tier Jev is rate-limited
+per model, which in testing meant about **one successful call every 5 minutes**. Other models
+were not limited. Failed calls are not billed. To remove the limit, buy AI Gateway Credits
+for the team that owns your key. Free credits unlocked by adding a card don't count. See
+https://vercel.com/docs/ai-gateway/rate-limits. Until then, wait 5 minutes between runs.
