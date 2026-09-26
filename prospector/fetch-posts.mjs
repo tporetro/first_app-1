@@ -6,7 +6,7 @@ import { SUBREDDITS, DAYS, PREFILTER } from './config.mjs';
 import { dataPath, sleep } from './lib.mjs';
 
 const API = 'https://arctic-shift.photon-reddit.com/api/posts/search';
-const FIELDS = 'id,title,selftext,created_utc,author,permalink,subreddit,link_flair_text,removed_by_category';
+const FIELDS = 'id,title,selftext,created_utc,author,subreddit,link_flair_text';
 const after = Math.floor(Date.now() / 1000) - DAYS * 86400;
 
 async function getPage(subreddit, before) {
@@ -19,12 +19,19 @@ async function getPage(subreddit, before) {
       const res = await fetch(`${API}?${params}`, { headers: { 'User-Agent': 'prospector/0.1 (local script)' } });
       const body = await res.json();
       if (res.ok && Array.isArray(body.data)) return body.data;
+      // A 4xx is a bad request and retrying will not help, except the archive's
+      // load-shedding reply (422 "Timeout. Maybe slow down a bit") and 429.
+      const overloaded = res.status === 429 || /timeout|slow down/i.test(body.error ?? '');
+      if (res.status >= 400 && res.status < 500 && !overloaded) {
+        throw Object.assign(new Error(`r/${subreddit}: ${res.status} ${body.error ?? ''}`), { fatal: true });
+      }
       // The archive answers "Timeout. Maybe slow down a bit" under load.
       console.warn(`  r/${subreddit}: ${res.status} ${body.error ?? ''} — retrying`);
     } catch (error) {
+      if (error.fatal) throw error;
       console.warn(`  r/${subreddit}: ${error.message} — retrying`);
     }
-    await sleep(3000 * (attempt + 1));
+    await sleep(5000 * (attempt + 1));
   }
   throw new Error(`r/${subreddit}: archive kept failing, giving up on this subreddit`);
 }
@@ -48,7 +55,7 @@ for (const subreddit of SUBREDDITS) {
         matched++;
         kept.push({
           id: p.id,
-          url: `https://www.reddit.com${p.permalink}`,
+          url: `https://www.reddit.com/r/${p.subreddit}/comments/${p.id}/`,
           subreddit: p.subreddit,
           created: new Date(p.created_utc * 1000).toISOString(),
           title: p.title,
@@ -59,7 +66,7 @@ for (const subreddit of SUBREDDITS) {
       const oldest = page.at(-1).created_utc;
       if (page.length < 100 || oldest <= after) break;
       before = oldest;
-      await sleep(1000);
+      await sleep(2000);
     }
   } catch (error) {
     console.error(`  ${error.message}`);
