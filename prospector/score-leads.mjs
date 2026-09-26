@@ -20,7 +20,7 @@ const paced = MIN_MS_BETWEEN_CALLS > 0;
 console.log(`${posts.length} posts, ${posts.filter(p => done.has(p.id)).length} already scored, ${todo.length} to score ` +
   (paced ? `(1 call every ${MIN_MS_BETWEEN_CALLS / 1000} s, ~${Math.ceil(todo.length * MIN_MS_BETWEEN_CALLS / 60000)} min)` : `(${CONCURRENCY} at a time)`));
 // When paced, a 429 means the window has not reopened yet: wait it out, a few times.
-const backoff = paced ? [60_000, 120_000, MIN_MS_BETWEEN_CALLS] : undefined;
+const backoff = paced ? Array(7).fill(60_000) : undefined;
 
 const stateFor = p =>
   `Subreddit: r/${p.subreddit}\nTitle: ${p.title}\n\n${p.body}`.slice(0, MAX_STATE_CHARS);

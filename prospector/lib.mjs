@@ -45,13 +45,13 @@ export async function jev(state, questions, backoff = BACKOFF_MS) {
 }
 
 // Run fn over items with at most `limit` in flight. With minGapMs > 0, run one
-// at a time and start each call at least minGapMs after the previous one.
+// at a time and wait minGapMs after each finishes (the limit window starts at
+// the last successful call, which may come after several retries).
 export async function pool(items, limit, fn, minGapMs = 0) {
   if (minGapMs > 0) {
     for (let i = 0; i < items.length; i++) {
-      const started = Date.now();
       await fn(items[i], i);
-      if (i < items.length - 1) await sleep(Math.max(0, started + minGapMs - Date.now()));
+      if (i < items.length - 1) await sleep(minGapMs);
     }
     return;
   }
