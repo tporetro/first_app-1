@@ -1,5 +1,5 @@
 {
-  "dry_run": true,
+  "dry_run": false,
   "ledger_path": "data/ledger.jsonl",
   "state_path": "data/state.json",
   "log_level": "INFO",
