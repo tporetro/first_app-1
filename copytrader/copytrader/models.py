@@ -14,6 +14,7 @@ class Leader:
     rank: int
     pnl: float
     volume: float
+    category: str = "OVERALL"
 
 
 @dataclass(frozen=True)

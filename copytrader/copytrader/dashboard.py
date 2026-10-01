@@ -21,6 +21,8 @@ SKIP_LABELS = [
     (r"no (yes|no) (ask|bid)", "No liquidity on Kalshi"),
     (r"rounds to 0", "Order would be under 1 contract"),
     (r"max_open_positions", "Open-position limit reached"),
+    (r"leaders disagree", "Would bet against a position we already hold"),
+    (r"min_leader_usdc", "Leader trade too small"),
     (r"not tradable", "Kalshi market closed"),
     (r"quote failed|balance unavailable", "Kalshi API error"),
 ]
@@ -47,7 +49,9 @@ def summarise(path: str, name: str) -> dict:
             meta["last"] = max(meta["last"] or t, t)
         if k == "leaderboard":
             meta["category"] = d.get("category")
-            leaders = [{"rank": l["rank"], "name": l["name"], "pnl": l["pnl"], "wallet": l["wallet"]}
+            meta["domains"] = d.get("domains")
+            leaders = [{"rank": l["rank"], "name": l["name"], "pnl": l["pnl"], "wallet": l["wallet"],
+                        "category": l.get("category", "")}
                        for l in d["leaders"]]
         elif k in ("unmapped", "decision"):
             reason = d["reasons"][-1] if k == "unmapped" else d["reason"]

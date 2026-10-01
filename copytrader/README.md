@@ -41,6 +41,38 @@ contracts  = floor(notional / (limit + fee/contract))
 `paper_balance_usd`. Defaults are 2% per signal, $50 max per order, $150 per market, $300 per day,
 and 15 open positions.
 
+## Market areas (domains)
+
+Each domain has its own keywords and the Kalshi categories searched for its twin. Leaders are
+the top 20 of **each** specialist leaderboard listed in `polymarket.leaderboard_categories`.
+
+| Domain | On by default | Kalshi categories | Why |
+|---|---|---|---|
+| politics | yes | Elections, Politics | Most matched orders in replays (Brazil, US House/Senate, PM races) |
+| geopolitics | yes | World, Politics | Wars, ceasefires, sanctions, leaders. Polymarket has no geopolitics leaderboard; these traders rank on POLITICS |
+| economics | yes | Economics, Financials, Commodities, Companies | Fed/ECB decisions match exactly by meeting and size |
+| weather | yes | Climate and Weather | Matches only when city, day and temperature bucket are identical (Kalshi buckets are often offset by 1°) |
+| crypto | no | Crypto | 0 valid matches in replay: Polymarket's top crypto traders trade 5-minute candles and "touch" markets, which Kalshi doesn't list in the same form |
+
+Replay of 72h across POLITICS + FINANCE + ECONOMICS + WEATHER leaders (78 wallets): 7,125
+fills → 2,266 signals → 60 matched → 28 paper orders.
+
+## Always-on server
+
+`python -m copytrader -c config.server.json serve` runs the engine forever (auto-restarts on
+crash) and serves the dashboard at `/?key=<DASHBOARD_KEY>`. `/health` is open for uptime checks.
+
+**Render (can be done from a phone):**
+1. Sign in at render.com with GitHub.
+2. New → Blueprint → choose this repo and branch. Render reads `render.yaml` at the repo root.
+3. Approve. It builds the Docker image, attaches a 1 GB disk for the ledger, and generates `DASHBOARD_KEY`.
+4. Open Environment → copy `DASHBOARD_KEY`, then visit `https://<service>.onrender.com/?key=<that key>`.
+
+The instance is `0.5c-512mb` (~$7/month; free instances sleep, which would stop the engine).
+Peak memory measured at ~300 MB.
+
+**Any VPS:** `docker compose up -d` (see `docker-compose.yml`) or the systemd unit in `deploy/`.
+
 ## Setup
 
 ```bash
@@ -49,7 +81,7 @@ python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 cp config.example.json config.json
 cp mapping_overrides.example.json mapping_overrides.json   # optional
-python -m pytest -q                                        # 34 offline tests
+python -m pytest -q                                        # 41 offline tests
 ```
 
 Kalshi credentials are optional in dry-run. With them, the dry run sizes against your real balance:
@@ -98,7 +130,7 @@ For OS-level enforcement, run `sudo chattr +a data/ledger.jsonl`.
 
 ## Validation on real data
 
-A replay of 72h of fills from the top-20 POLITICS leaderboard covered 962 fills, which aggregated
+An earlier replay of 72h of fills from the top-20 POLITICS leaderboard covered 962 fills, which aggregated
 into 216 signals. Of those, 40 mapped to Kalshi and 22 produced dry-run orders; the rest were
 skipped with logged reasons. That replay surfaced mismaps which are now covered by regression
 tests in `tests/test_mapping.py`:
@@ -115,6 +147,8 @@ runoff". The price-divergence guard also blocked several bad pairs independently
   top wallets are market makers whose fills aren't directional bets.
 - **Exits** mirror the leader's SELL fills. Redemptions, merges and transfers show up as
   `position_change` entries in the ledger but don't trigger trades.
+- **Opposite sides:** if two leaders bet opposite ways on one market, we keep the first position
+  and skip the second rather than paying fees to hedge against ourselves.
 - **IOC orders** may partially fill or not fill at all. Position state is only updated with what
   actually filled.
 - **Eligibility.** Kalshi is a CFTC-regulated US exchange and requires a verified account. This

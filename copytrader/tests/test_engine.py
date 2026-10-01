@@ -82,3 +82,30 @@ def test_untracked_wallet_ignored_by_stream(tmp_path, candidates):
     eng.stream.handle_ws_message(json.dumps(payload))
     eng.stream.handle_ws_message(json.dumps(payload))  # duplicate suppressed
     assert eng.q.qsize() == 1
+
+
+def test_server_auth(tmp_path):
+    import threading
+    import urllib.error
+    import urllib.request
+    from http.server import ThreadingHTTPServer
+
+    from copytrader.serve import Supervisor, make_handler
+
+    led = tmp_path / "l.jsonl"
+    Ledger(str(led), "DRY_RUN").append("x", {})
+    html = tmp_path / "d.html"
+    html.write_text("<p>dash</p>")
+    sup = Supervisor(lambda: None, str(led), str(html))
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(sup, "secret"))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    assert json.loads(urllib.request.urlopen(base + "/health").read())["ledger_records"] == 1
+    for path in ("/", "/?key=wrong", "/ledger.jsonl"):
+        try:
+            urllib.request.urlopen(base + path)
+            raise AssertionError(path)
+        except urllib.error.HTTPError as e:
+            assert e.code == 403
+    assert b"dash" in urllib.request.urlopen(base + "/?key=secret").read()
+    srv.shutdown()

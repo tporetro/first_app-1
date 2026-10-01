@@ -112,3 +112,54 @@ def test_first_round_not_runoff():
 def test_multi_state_bundles_excluded():
     m, _ = mapper(REAL).map("Will the Republicans win the Kansas Senate race in 2026?", "No")
     assert m is None or "THREESTATE" not in m.ticker
+
+
+def _wx(ticker, city, sub, title_range):
+    return cand(ticker, f"Will the maximum temperature be {title_range} on Oct 1, 2026?", sub,
+                event_title=f"Highest temperature in {city} on Oct 1, 2026?", event=ticker.rsplit("-", 1)[0])
+
+
+WEATHER = [
+    _wx("KXHIGHTATL-26OCT01-B85.5", "Atlanta", "85° to 86°", "85-86°"),
+    _wx("KXHIGHTATL-26OCT01-B87.5", "Atlanta", "87° to 88°", "87-88°"),
+    _wx("KXHIGHTATL-26OCT01-T92", "Atlanta", "93° or above", ">92°"),
+    _wx("KXHIGHTHOU-26OCT01-B92.5", "Houston", "92° to 93°", "92-93°"),
+    cand("KXHIGHTATL-26OCT02-B87.5", "Will the maximum temperature be 87-88° on Oct 2, 2026?", "87° to 88°",
+         event_title="Highest temperature in Atlanta on Oct 2, 2026?", event="KXHIGHTATL-26OCT02"),
+    cand("KXCLOSESTSENATE-27JAN03-GA", "Will Georgia have the smallest margin of victory in 2026 Senate races?",
+         "Georgia"),
+]
+WX = ["politics", "economics", "weather"]
+
+
+def test_weather_exact_bucket_city_and_day():
+    m, r = mapper(WEATHER, domains=WX).map(
+        "Will the highest temperature in Atlanta be between 87-88°F on October 1?", "Yes")
+    assert m is not None and m.ticker == "KXHIGHTATL-26OCT01-B87.5", r
+    m, _ = mapper(WEATHER, domains=WX).map(
+        "Will the highest temperature in Atlanta be 93°F or higher on October 1?", "Yes")
+    assert m.ticker == "KXHIGHTATL-26OCT01-T92"
+
+
+def test_weather_offset_bucket_wrong_city_wrong_day_rejected():
+    mp = mapper(WEATHER, domains=WX)
+    assert mp.map("Will the highest temperature in Atlanta be between 86-87°F on October 1?", "Yes")[0] is None
+    assert mp.map("Will the highest temperature in Dallas be between 92-93°F on October 1?", "Yes")[0] is None
+    assert mp.map("Will the highest temperature in Atlanta be between 87-88°F on October 3?", "Yes")[0] is None
+
+
+def test_weather_disabled_domain_ignored():
+    assert mapper(WEATHER, domains=["politics"]).map(
+        "Will the highest temperature in Atlanta be between 87-88°F on October 1?", "Yes")[0] is None
+
+
+def test_margin_markets_not_race_winner():
+    assert mapper(WEATHER, domains=WX).map("Will the Republicans win the Georgia Senate race in 2026?",
+                                           "Yes")[0] is None
+
+
+def test_geopolitics_domain_gate():
+    from copytrader.mapping import classify
+    assert classify("US announces end of Iranian blockade by September 30, 2026?",
+                    domains=["geopolitics"])[0] == "geopolitics"
+    assert classify("US announces end of Iranian blockade by September 30, 2026?", domains=["politics"])[0] is None

@@ -19,7 +19,9 @@ KALSHI_BASE_URLS = {
 class PolymarketConfig:
     data_api: str = "https://data-api.polymarket.com"
     rtds_url: str = "wss://ws-live-data.polymarket.com"
-    leaderboard_category: str = "OVERALL"  # OVERALL | POLITICS | FINANCE | ECONOMICS | ...
+    # Track the top_n of EACH leaderboard (specialists beat the overall board, which is mostly sports).
+    # Valid: OVERALL POLITICS FINANCE ECONOMICS CRYPTO TECH CULTURE WEATHER SPORTS MENTIONS
+    leaderboard_categories: list = field(default_factory=lambda: ["POLITICS", "FINANCE", "WEATHER"])
     leaderboard_period: str = "MONTH"  # DAY | WEEK | MONTH | ALL
     leaderboard_order_by: str = "PNL"  # PNL | VOL
     top_n: int = 20
@@ -35,9 +37,9 @@ class PolymarketConfig:
 
 @dataclass
 class MappingConfig:
-    kalshi_categories: list = field(
-        default_factory=lambda: ["Elections", "Politics", "Economics", "Financials"]
-    )
+    # Market areas to copy: politics, geopolitics, economics, crypto, weather (see mapping.DOMAINS)
+    domains: list = field(default_factory=lambda: ["politics", "geopolitics", "economics", "weather"])
+    kalshi_categories: list = field(default_factory=list)  # empty = derived from domains
     index_refresh_s: int = 900
     min_score: float = 0.55
     min_margin: float = 0.05  # best match must beat runner-up by this much

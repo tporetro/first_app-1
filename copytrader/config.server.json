@@ -1,0 +1,35 @@
+{
+  "dry_run": true,
+  "ledger_path": "data/ledger.jsonl",
+  "state_path": "data/state.json",
+  "log_level": "INFO",
+  "polymarket": {
+    "leaderboard_categories": ["POLITICS", "FINANCE", "ECONOMICS", "WEATHER"],
+    "leaderboard_period": "MONTH",
+    "top_n": 20,
+    "use_websocket": true,
+    "poll_interval_s": 20,
+    "position_poll_interval_s": 180,
+    "min_leader_usdc": 250,
+    "aggregation_window_s": 20,
+    "signal_max_age_s": 300
+  },
+  "mapping": {
+    "domains": ["politics", "geopolitics", "economics", "weather"],
+    "min_score": 0.55,
+    "min_margin": 0.05,
+    "overrides_path": "mapping_overrides.json"
+  },
+  "kalshi": {"env": "prod"},
+  "risk": {
+    "bankroll_fraction": 0.02,
+    "conviction_ref_usdc": 10000,
+    "max_order_usd": 50,
+    "max_market_exposure_usd": 150,
+    "max_daily_usd": 300,
+    "max_open_positions": 15,
+    "slippage": 0.02,
+    "max_divergence": 0.08,
+    "paper_balance_usd": 1000
+  }
+}

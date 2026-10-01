@@ -63,16 +63,18 @@ class Engine:
     # -- setup -----------------------------------------------------------
     def bootstrap(self) -> None:
         added, _ = self.tracker.refresh(force=True)
-        board = sorted((self.tracker.get(w) for w in self.tracker.wallets()), key=lambda l: l.rank)
+        board = sorted((self.tracker.get(w) for w in self.tracker.wallets()), key=lambda l: (l.category, l.rank))
         self.ledger.append("leaderboard", {
-            "category": self.cfg.polymarket.leaderboard_category,
+            "category": ", ".join(self.cfg.polymarket.leaderboard_categories),
+            "domains": self.cfg.mapping.domains,
             "period": self.cfg.polymarket.leaderboard_period,
             "leaders": [l.__dict__ for l in board],
         })
         for l in board:
-            log.info("Tracking #%-2d %-24s pnl=$%-12s %s", l.rank, l.name[:24], f"{l.pnl:,.0f}", l.wallet)
+            log.info("Tracking %-8s #%-2d %-24s pnl=$%-12s %s", l.category, l.rank, l.name[:24],
+                     f"{l.pnl:,.0f}", l.wallet)
         n = self.mapper.refresh_index(force=True)
-        self.ledger.append("kalshi_index", {"markets": n, "categories": self.cfg.mapping.kalshi_categories})
+        self.ledger.append("kalshi_index", {"markets": n, "categories": self.mapper.categories})
         seeded = self.stream.seed()
         log.info("Seeded %d historical fills as already-seen (never traded on)", seeded)
         self.positions.poll(self.tracker.wallets(), lambda c: None)  # baseline snapshot

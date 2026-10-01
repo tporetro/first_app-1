@@ -209,9 +209,9 @@ function render() {
     `<div class="bar"><i style="width:${(k.count / max) * 100}%"></i></div>` +
     `<small>e.g. ${esc(k.example)}</small></div>`).join("") : '<span class="muted">Nothing skipped yet.</span>';
 
-  $("cat").textContent = s.meta.category ? `${s.meta.category} leaderboard, last 30 days` : "";
+  $("cat").textContent = s.meta.category ? `Top ${s.meta.category.toLowerCase()}, last 30 days` : "";
   $("leaders").innerHTML = s.leaders.map((l) =>
-    `<li><span class="r">#${l.rank}</span><span class="n">${esc(l.name)}</span><span class="p">+${big(l.pnl)}</span></li>`).join("");
+    `<li><span class="r">#${l.rank}</span><span class="n">${esc(l.name)}${l.category ? ` <span class="muted">· ${esc(l.category.toLowerCase())}</span>` : ""}</span><span class="p">+${big(l.pnl)}</span></li>`).join("");
   $("chain").innerHTML = s.chain.ok
     ? `Ledger <span class="mono">${esc(s.file)}</span>: ${s.chain.records.toLocaleString()} records, hash chain verified. Head <span class="mono">${esc(s.chain.head.slice(0, 16))}…</span>`
     : `Ledger check failed: ${esc(s.chain.error)}`;

@@ -63,6 +63,7 @@ class DataAPI:
                     rank=int(r.get("rank", 0)),
                     pnl=float(r.get("pnl") or 0),
                     volume=float(r.get("vol") or 0),
+                    category=category,
                 )
             )
         return out
@@ -127,13 +128,12 @@ class LeaderTracker:
     def refresh(self, force: bool = False) -> tuple[set, set]:
         if not force and time.time() - self._last < self.cfg.leaderboard_refresh_s:
             return set(), set()
-        board = self.api.leaderboard(
-            self.cfg.leaderboard_category,
-            self.cfg.leaderboard_period,
-            self.cfg.leaderboard_order_by,
-            self.cfg.top_n,
-        )
-        new = {l.wallet: l for l in board[: self.cfg.top_n]}
+        new: dict[str, Leader] = {}
+        for cat in self.cfg.leaderboard_categories:
+            board = self.api.leaderboard(cat, self.cfg.leaderboard_period,
+                                         self.cfg.leaderboard_order_by, self.cfg.top_n)
+            for l in board[: self.cfg.top_n]:
+                new.setdefault(l.wallet, l)  # first category listed wins for display
         for i, w in enumerate(self.cfg.extra_wallets):
             w = w.lower()
             new.setdefault(w, Leader(w, f"extra-{i}", 0, 0.0, 0.0))

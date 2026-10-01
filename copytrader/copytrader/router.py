@@ -154,6 +154,10 @@ class Router:
             return self._skip(sig, match, f"ask {ask:.3f} above limit {limit:.3f}", quote=q)
         if limit < r.min_price:
             return self._skip(sig, match, f"limit {limit:.3f} below min_price", quote=q)
+        other = "no" if side == "yes" else "yes"
+        if self.state.position(match.ticker, other)["contracts"] > 0:
+            return self._skip(sig, match, f"already hold {other.upper()} here; leaders disagree, not hedging "
+                                          "against ourselves", quote=q)
         if self.state.position(match.ticker, side)["contracts"] == 0 and \
                 self.state.open_positions() >= r.max_open_positions:
             return self._skip(sig, match, f"max_open_positions ({r.max_open_positions}) reached", quote=q)

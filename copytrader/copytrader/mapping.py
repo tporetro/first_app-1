@@ -38,31 +38,67 @@ log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------- vocabulary
 
-MACRO_KEYWORDS = {
-    # elections / politics
-    "election", "elections", "elected", "president", "presidential", "presidency", "senate",
-    "senator", "house", "congress", "congressional", "governor", "gubernatorial", "mayor",
-    "mayoral", "primary", "primaries", "caucus", "nominee", "nomination", "parliament",
-    "parliamentary", "prime minister", "chancellor", "referendum", "vote", "votes", "ballot",
-    "electoral", "democrat", "democrats", "democratic", "republican", "republicans", "gop",
-    "speaker", "impeach", "impeached", "cabinet", "supreme court", "midterm", "midterms",
-    "popular vote", "swing state", "approval rating", "secretary", "white house", "pope",
-    "nato", "coalition", "labour", "conservative", "tory", "shutdown", "executive order",
-    # macro / finance
-    "fed", "fomc", "federal reserve", "interest rate", "interest rates", "rate cut",
-    "rate cuts", "rate hike", "bps", "basis points", "cpi", "inflation", "pce", "gdp",
-    "unemployment", "jobless", "payrolls", "nonfarm", "jobs report", "recession", "s&p",
-    "s&p 500", "nasdaq", "dow", "treasury", "yield", "yields", "tariff", "tariffs",
-    "debt ceiling", "ecb", "boe", "bank of england", "bank of japan", "boj", "powell",
-    "stock market", "oil price", "wti", "brent", "gas prices", "mortgage", "housing",
-    "trade deal", "sanctions", "deficit", "budget", "tax", "irs", "earnings", "ipo",
+# Each domain: the words that put a Polymarket question in it, and the Kalshi categories
+# to search for its twin. Enable/disable domains in config ("mapping.domains").
+DOMAINS = {
+    "politics": {
+        "kalshi": ["Elections", "Politics"],
+        "keywords": {
+            "election", "elections", "elected", "president", "presidential", "presidency", "senate",
+            "senator", "house", "congress", "congressional", "governor", "gubernatorial", "mayor",
+            "mayoral", "primary", "primaries", "caucus", "nominee", "nomination", "parliament",
+            "parliamentary", "prime minister", "chancellor", "referendum", "vote", "votes", "ballot",
+            "electoral", "democrat", "democrats", "democratic", "republican", "republicans", "gop",
+            "speaker", "impeach", "impeached", "cabinet", "supreme court", "midterm", "midterms",
+            "popular vote", "swing state", "approval rating", "secretary", "white house", "pope",
+            "coalition", "labour", "conservative", "tory", "shutdown", "executive order",
+            "minister-president", "trump", "vance", "newsom", "pardon", "indicted", "resign",
+        },
+    },
+    "geopolitics": {
+        "kalshi": ["World", "Politics"],
+        "keywords": {
+            "war", "ceasefire", "cease-fire", "invade", "invasion", "airstrike", "airstrikes",
+            "military", "troops", "missile", "missiles", "nuclear", "blockade", "sanctions",
+            "treaty", "peace deal", "peace talks", "annex", "coup", "regime", "embassy", "nato",
+            "ukraine", "russia", "putin", "zelensky", "israel", "netanyahu", "gaza", "hamas",
+            "hezbollah", "iran", "khamenei", "china", "xi jinping", "taiwan", "north korea",
+            "kim jong", "venezuela", "maduro", "syria", "houthi", "houthis", "un security council",
+            "summit", "hostage", "hostages", "strait of hormuz", "greenland", "panama canal",
+        },
+    },
+    "economics": {
+        "kalshi": ["Economics", "Financials", "Commodities", "Companies"],
+        "keywords": {
+            "fed", "fomc", "federal reserve", "interest rate", "interest rates", "rate cut",
+            "rate cuts", "rate hike", "bps", "basis points", "cpi", "inflation", "pce", "gdp",
+            "unemployment", "jobless", "payrolls", "nonfarm", "jobs report", "recession", "s&p",
+            "s&p 500", "nasdaq", "dow", "treasury", "yield", "yields", "tariff", "tariffs",
+            "debt ceiling", "ecb", "boe", "bank of england", "bank of japan", "boj", "powell",
+            "stock market", "oil price", "crude oil", "wti", "brent", "gas prices", "gold",
+            "silver", "mortgage", "housing", "trade deal", "deficit", "budget", "tax", "irs",
+            "earnings", "ipo", "market cap", "largest company",
+        },
+    },
+    "crypto": {
+        "kalshi": ["Crypto"],
+        "keywords": {"bitcoin", "btc", "ethereum", "eth", "solana", "xrp", "dogecoin", "crypto"},
+    },
+    "weather": {
+        "kalshi": ["Climate and Weather"],
+        "keywords": {"temperature", "highest temperature", "rain", "snow", "hurricane",
+                     "tornado", "heatwave", "weather", "precipitation"},
+    },
 }
+DEFAULT_DOMAINS = ["politics", "geopolitics", "economics", "weather"]
 EXCLUDE_KEYWORDS = {
     "up or down", "updown", "nfl", "nba", "mlb", "nhl", "epl", "ufc", "fifa", "uefa",
     "premier league", "la liga", "serie a", "bundesliga", "champions league", "world cup",
     "tennis", "atp", "wta", "golf", "pga", "f1", "grand prix", "esports", "lol",
     "counter-strike", "cs2", "dota", "valorant", "ncaa", "cricket", "boxing", "mma",
     "fc", "touchdown", "super bowl", "stanley cup",
+    # short-dated crypto candles: by the time we mirror, the window is gone
+    "5m", "15m", "1h", "4h", "hourly", "5 minutes", "15 minutes",
 }
 
 SYNONYMS = [
@@ -108,8 +144,8 @@ MONTHS = ["january", "february", "march", "april", "may", "june", "july", "augus
           "september", "october", "november", "december"]
 MONTH_RE = re.compile(r"\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\b\.?", re.I)
 COMPARATORS = {
-    "above": ["above", "over", "more than", "greater than", "at least", "exceed", "higher than", "or more"],
-    "below": ["below", "under", "less than", "fewer than", "lower than", "at most", "or less"],
+    "above": ["above", "over", "more than", "greater than", "at least", "exceed", "higher than", "or more", "or higher", "or above"],
+    "below": ["below", "under", "less than", "fewer than", "lower than", "at most", "or less", "or lower", "or below"],
     "between": ["between"],
 }
 # multi-leg / parlay style Kalshi products never mirror a single Polymarket market
@@ -121,6 +157,7 @@ QUALIFIERS = {
     "first_round": ["first round", "1st round"],
     "runoff": ["runoff", "run-off", "second round", "qualify", "advance to"],
     "primary": ["primary", "nomination", "nominee"],
+    "margin": ["margin", "closest", "smallest margin", "largest margin"],
     "popular_vote_share": ["of the vote", "of the valid vote", "of the popular vote", "vote share"],
 }
 ORDINALS = {"first": 1, "1st": 1, "second": 2, "2nd": 2, "third": 3, "3rd": 3, "fourth": 4, "4th": 4,
@@ -178,9 +215,19 @@ def entities(text: str) -> set[str]:
     for m in CAP_RE.findall(text):
         for w in m.split():
             w = w.strip(".'-").lower()
-            if w and w not in STOPWORDS and len(w) > 2:
+            if w and w not in STOPWORDS and len(w) > 2 and not MONTH_RE.fullmatch(w):
                 ents.add(_stem(w))
     return ents
+
+
+DAY_RE = re.compile(
+    r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
+    r"jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b", re.I)
+
+
+def days(text: str) -> set[tuple[str, int]]:
+    """Specific calendar days mentioned, e.g. {('oct', 1)}."""
+    return {(m.group(1).lower()[:3], int(m.group(2))) for m in DAY_RE.finditer(text)}
 
 
 def months(text: str, close_time: str = "") -> set[str]:
@@ -194,6 +241,8 @@ def comparators(text: str) -> set[str]:
     t = f" {text.lower()} "
     out = {k for k, words in COMPARATORS.items()
            if any(re.search(rf"(?<![a-z]){re.escape(w)}(?![a-z])", t) for w in words)}
+    if re.search(r"\d\s*°?f?\s*(?:-|–|to)\s*\$?\d", t) and not re.search(r"\d{4}-\d{2}", t):
+        out.add("between")
     if re.search(r"[>≥]\s*\$?\d", t):
         out.add("above")
     if re.search(r"[<≤]\s*\$?\d", t):
@@ -215,15 +264,31 @@ def rank(text: str) -> int:
     return ORDINALS[(m.group(1) or m.group(2)).lower()]
 
 
-def is_macro(trade_title: str, slug: str = "", event_slug: str = "") -> tuple[bool, str]:
+def classify(trade_title: str, slug: str = "", event_slug: str = "",
+             domains: Optional[list] = None) -> tuple[Optional[str], str]:
+    """Return (domain, reason) for an enabled domain, or (None, reason)."""
     hay = f" {trade_title} {slug.replace('-', ' ')} {event_slug.replace('-', ' ')} ".lower()
     for k in EXCLUDE_KEYWORDS:
         if re.search(rf"(?<![a-z0-9]){re.escape(k)}(?![a-z0-9])", hay):
-            return False, f"excluded keyword '{k.strip()}'"
-    for k in MACRO_KEYWORDS:
-        if re.search(rf"(?<![a-z]){re.escape(k)}(?![a-z])", hay):
-            return True, f"macro keyword '{k}'"
-    return False, "no macro keyword"
+            return None, f"excluded keyword '{k.strip()}'"
+    for name in domains or DEFAULT_DOMAINS:
+        for k in DOMAINS[name]["keywords"]:
+            if re.search(rf"(?<![a-z]){re.escape(k)}(?![a-z])", hay):
+                return name, f"{name} keyword '{k}'"
+    return None, "no keyword from an enabled domain"
+
+
+def is_macro(trade_title: str, slug: str = "", event_slug: str = "",
+             domains: Optional[list] = None) -> tuple[bool, str]:
+    dom, why = classify(trade_title, slug, event_slug, domains)
+    return dom is not None, why
+
+
+def kalshi_categories_for(domains: list) -> list:
+    out = []
+    for d in domains:
+        out += [c for c in DOMAINS[d]["kalshi"] if c not in out]
+    return out
 
 
 # -------------------------------------------------------------------- index
@@ -288,6 +353,10 @@ class MarketMapper:
         self._lock = threading.Lock()
         self._cache: dict[tuple, tuple[float, Optional[MarketMatch], list]] = {}
         self.overrides = {"condition_id": {}, "slug": {}}
+        unknown = set(cfg.domains) - set(DOMAINS)
+        if unknown:
+            raise ValueError(f"Unknown mapping domains {sorted(unknown)}; choose from {sorted(DOMAINS)}")
+        self.categories = cfg.kalshi_categories or kalshi_categories_for(cfg.domains)
         if cfg.overrides_path:
             p = cfg.overrides_path
             p = p if os.path.isabs(p) else os.path.join(base_dir, p)
@@ -310,9 +379,9 @@ class MarketMapper:
             return 0
         if not force and self.index and time.time() - self._built < self.cfg.index_refresh_s:
             return len(self.index.cands)
-        cands = self.kalshi.list_candidates(self.cfg.kalshi_categories)
+        cands = self.kalshi.list_candidates(self.categories)
         self.set_candidates(cands)
-        log.info("Kalshi index built: %d open markets in %s", len(cands), self.cfg.kalshi_categories)
+        log.info("Kalshi index built: %d open markets in %s", len(cands), self.categories)
         return len(cands)
 
     # -- mapping ---------------------------------------------------------
@@ -352,7 +421,7 @@ class MarketMapper:
         ov = self._override(condition_id, slug, outcome)
         if ov:
             return ov, ["manual override"]
-        ok, why = is_macro(title, slug, event_slug)
+        ok, why = is_macro(title, slug, event_slug, self.cfg.domains)
         reasons.append(why)
         if not ok:
             return None, reasons
@@ -369,6 +438,10 @@ class MarketMapper:
         q_years, q_nums = years(title), numbers(title)
         q_months, q_cmp = months(title), comparators(title)
         q_qual, q_rank = qualifiers(title), rank(title)
+        q_days = days(title)
+        domain, _ = classify(title, slug, event_slug, self.cfg.domains)
+        strict = domain in ("weather", "crypto")  # location/asset must match exactly
+        q_proper = {e for e in entities(title) if e[:3] not in {m[:3] for m in MONTHS}} - {"will"}
         q_ents = entities(title) | (entities(oc) if named else set())
         q_neg = bool(NEGATIONS & set(re.findall(r"[a-z']+", title.lower())))
         oc_toks = set(tokens(oc)) if named else set()
@@ -405,6 +478,12 @@ class MarketMapper:
             k_rank = rank(khead)
             if q_rank != k_rank:
                 veto.append(f"rank {q_rank} vs {k_rank}")
+            if q_days:
+                k_days = days(khead)
+                if k_days and not (q_days & k_days):
+                    veto.append(f"date {sorted(q_days)} vs {sorted(k_days)}")
+            if strict and q_proper - set(tokens(khead)) - entities(khead):
+                veto.append(f"place/asset {sorted(q_proper - set(tokens(khead)) - entities(khead))} not in contract")
             if q_nums:
                 k_nums = numbers(f"{c.title} {c.yes_sub_title} {c.event_title} {c.rules}")
                 missing = [n for n in q_nums if not any(abs(n - kn) < 1e-6 for kn in k_nums)]

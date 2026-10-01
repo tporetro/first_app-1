@@ -83,9 +83,14 @@ class KalshiClient:
         self.signer: Optional[Signer] = None
         key_id = os.environ.get(cfg.key_id_env)
         key_path = os.environ.get(cfg.private_key_path_env)
-        if key_id and key_path:
-            with open(os.path.expanduser(key_path), "rb") as fh:
-                self.signer = Signer(key_id, fh.read())
+        key_pem = os.environ.get("KALSHI_PRIVATE_KEY")  # PEM text, for hosts that only take env secrets
+        if key_id and (key_pem or key_path):
+            if key_pem:
+                pem = key_pem.replace("\\n", "\n").encode()
+            else:
+                with open(os.path.expanduser(key_path), "rb") as fh:
+                    pem = fh.read()
+            self.signer = Signer(key_id, pem)
             log.info("Kalshi credentials loaded (%s key, %s)", self.signer.kind, cfg.env)
 
     @property

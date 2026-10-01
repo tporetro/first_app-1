@@ -46,13 +46,36 @@ def cmd_run(args, cfg) -> int:
     return 0
 
 
+def cmd_serve(args, cfg) -> int:
+    from .engine import Engine
+    from .serve import serve
+
+    live, banner = resolve_live_mode(cfg, args.live)
+    if args.live and not live:
+        log.error("--live requested but not all live gates are satisfied: %s", banner)
+        return 2
+    mode = "LIVE" if live else "DRY_RUN"
+    log.warning("MODE: %s | ledger %s", banner, os.path.abspath(cfg.ledger_path))
+    kalshi = KalshiClient(cfg.kalshi)
+    if live and not kalshi.authenticated:
+        log.error("Live mode needs Kalshi credentials")
+        return 2
+    led = ledger_mod.Ledger(cfg.ledger_path, mode)
+    led.append("startup", {"mode": mode, "banner": banner, "config": cfg.to_dict(), "server": True})
+    base = os.path.dirname(os.path.abspath(args.config or "."))
+    serve(lambda: Engine(cfg, kalshi, led, live, base_dir=base), cfg.ledger_path,
+          os.path.join(os.path.dirname(cfg.ledger_path), "dashboard.html"),
+          int(os.environ.get("PORT", args.port)))
+    return 0
+
+
 def cmd_leaderboard(args, cfg) -> int:
     api = DataAPI(cfg.polymarket.data_api)
-    board = api.leaderboard(args.category or cfg.polymarket.leaderboard_category,
-                            cfg.polymarket.leaderboard_period, cfg.polymarket.leaderboard_order_by,
-                            cfg.polymarket.top_n)
-    for l in board:
-        print(f"#{l.rank:<3} {l.name[:28]:<28} pnl=${l.pnl:>14,.0f} vol=${l.volume:>16,.0f}  {l.wallet}")
+    for cat in ([args.category] if args.category else cfg.polymarket.leaderboard_categories):
+        print(f"== {cat}")
+        for l in api.leaderboard(cat, cfg.polymarket.leaderboard_period, cfg.polymarket.leaderboard_order_by,
+                                 cfg.polymarket.top_n):
+            print(f"#{l.rank:<3} {l.name[:28]:<28} pnl=${l.pnl:>14,.0f} vol=${l.volume:>16,.0f}  {l.wallet}")
     return 0
 
 
@@ -148,6 +171,9 @@ def main(argv=None) -> int:
     r.add_argument("--live", action="store_true", help="request live trading (also needs config + env gate)")
     r.add_argument("--once", action="store_true", help="bootstrap, process one aggregation window, exit")
     r.add_argument("--duration", type=float, help="stop after N seconds")
+    sv = sub.add_parser("serve", help="always-on: run the engine forever + serve the dashboard over HTTP")
+    sv.add_argument("--live", action="store_true")
+    sv.add_argument("--port", type=int, default=8080)
     sub.add_parser("leaderboard", help="print tracked leaders").add_argument("--category")
     m = sub.add_parser("map", help="debug the Polymarket->Kalshi mapper")
     m.add_argument("question")
@@ -174,7 +200,11 @@ def main(argv=None) -> int:
             val = getattr(cfg, attr)
             if not os.path.isabs(val):
                 setattr(cfg, attr, os.path.join(base, val))
-    handlers = {"run": cmd_run, "leaderboard": cmd_leaderboard, "map": cmd_map,
+    data_dir = os.environ.get("DATA_DIR")  # persistent disk on a server
+    if data_dir:
+        cfg.ledger_path = os.path.join(data_dir, os.path.basename(cfg.ledger_path))
+        cfg.state_path = os.path.join(data_dir, os.path.basename(cfg.state_path))
+    handlers = {"serve": cmd_serve, "run": cmd_run, "leaderboard": cmd_leaderboard, "map": cmd_map,
                 "verify-ledger": cmd_verify, "report": cmd_report, "replay": cmd_replay,
                 "dashboard": cmd_dashboard}
     return handlers[args.cmd](args, cfg)

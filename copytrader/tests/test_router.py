@@ -130,3 +130,12 @@ def test_live_gate(monkeypatch):
     assert resolve_live_mode(cfg, True)[0] is False  # no env confirm
     monkeypatch.setenv(LIVE_CONFIRM_ENV, LIVE_CONFIRM_VALUE)
     assert resolve_live_mode(cfg, True)[0] is True
+
+
+def test_no_hedging_against_ourselves(tmp_path):
+    r, _, _ = make(tmp_path)
+    assert r.handle(sig(), match("yes"))["decision"] == "ORDER"
+    s = sig(outcome="No", price=0.38)
+    s.first_ts = 5
+    res = r.handle(s, match("no"))
+    assert res["decision"] == "SKIP" and "leaders disagree" in res["reason"]

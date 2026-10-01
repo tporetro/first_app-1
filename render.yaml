@@ -1,0 +1,27 @@
+# Render Blueprint: New > Blueprint > pick this repo + branch. Creates the always-on copytrader.
+services:
+  - type: web
+    name: copytrader
+    runtime: docker
+    plan: 0.5c-512mb          # paid instance: free web services sleep, which would stop the engine
+    region: virginia          # close to Kalshi's US servers
+    dockerfilePath: ./copytrader/Dockerfile
+    dockerContext: ./copytrader
+    buildFilter:
+      paths: ["copytrader/**", "render.yaml"]
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:                     # keeps the ledger + state across deploys and restarts
+      name: copytrader-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DASHBOARD_KEY     # your private dashboard password (shown in Render > Environment)
+        generateValue: true
+      - key: DATA_DIR
+        value: /data
+      # Optional, only for sizing against your real balance (still dry-run):
+      - key: KALSHI_API_KEY_ID
+        sync: false
+      - key: KALSHI_PRIVATE_KEY
+        sync: false

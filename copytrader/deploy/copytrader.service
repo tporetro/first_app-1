@@ -1,0 +1,17 @@
+# Any Linux VPS: sudo cp deploy/copytrader.service /etc/systemd/system/ && sudo systemctl enable --now copytrader
+[Unit]
+Description=copytrader (Polymarket -> Kalshi mirror, dry-run by default)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/copytrader
+EnvironmentFile=/opt/copytrader/.env
+Environment=DATA_DIR=/opt/copytrader/data
+ExecStart=/opt/copytrader/.venv/bin/python -m copytrader -c config.server.json serve
+Restart=always
+RestartSec=10
+User=copytrader
+
+[Install]
+WantedBy=multi-user.target

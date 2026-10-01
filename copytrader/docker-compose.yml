@@ -1,0 +1,8 @@
+# Any VPS with Docker: echo "DASHBOARD_KEY=$(openssl rand -hex 24)" > .env && docker compose up -d
+services:
+  copytrader:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports: ["8080:8080"]
+    volumes: ["./data:/data"]
