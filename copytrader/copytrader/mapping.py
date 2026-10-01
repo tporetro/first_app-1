@@ -159,7 +159,30 @@ QUALIFIERS = {
     "primary": ["primary", "nomination", "nominee"],
     "margin": ["margin", "closest", "smallest margin", "largest margin"],
     "popular_vote_share": ["of the vote", "of the valid vote", "of the popular vote", "vote share"],
+    "relative_order": ["next leader out", "next to leave", "first to leave", "next one out"],
+    "temp_max": ["highest temperature", "maximum temperature", "high temperature"],
+    "temp_min": ["lowest temperature", "minimum temperature", "low temperature"],
 }
+# what has to happen for the contract to pay; both sides must name the same kind of event
+EVENT_TYPES = {
+    "invasion": {"invade", "invades", "invaded", "invasion"},
+    "arrest": {"arrest", "arrested", "arrests"},
+    "pardon": {"pardon", "pardons", "pardoned"},
+    "ceasefire": {"ceasefire"},
+    "resignation": {"resign", "resigns", "resigned", "resignation"},
+    "impeachment": {"impeach", "impeached", "impeachment"},
+    "indictment": {"indict", "indicted", "indictment"},
+    "strike": {"strike", "strikes", "airstrike", "airstrikes"},
+    "visit": {"visit", "visits", "visited", "travel", "travels"},
+    "military_action": {"military", "attack", "attacks"},
+    "meeting": {"meet", "meets"},
+}
+REGION_RE = re.compile(r"\belection from ([A-Z][\w ]+?)\s*\??$")
+
+
+def event_types(text: str) -> set[str]:
+    words = set(re.findall(r"[a-z]+", text.lower()))
+    return {k for k, ws in EVENT_TYPES.items() if words & ws}
 ORDINALS = {"first": 1, "1st": 1, "second": 2, "2nd": 2, "third": 3, "3rd": 3, "fourth": 4, "4th": 4,
             "fifth": 5, "5th": 5, "sixth": 6, "6th": 6}
 RANK_RE = re.compile(
@@ -228,6 +251,68 @@ DAY_RE = re.compile(
 def days(text: str) -> set[tuple[str, int]]:
     """Specific calendar days mentioned, e.g. {('oct', 1)}."""
     return {(m.group(1).lower()[:3], int(m.group(2))) for m in DAY_RE.finditer(text)}
+
+
+TICKER_YEAR_RE = re.compile(r"^(?:(20[2-4]\d)|([2-4]\d))$")  # bare cycle years only, not dates like 26JUN30
+
+
+def ticker_years(*tickers: str) -> set[str]:
+    """Years encoded in Kalshi tickers, e.g. SENATEOHS-26-R -> {'2026'}, KXFED-26OCT -> {'2026'}."""
+    out = set()
+    for t in tickers:
+        for seg in (t or "").upper().split("-")[1:]:
+            m = TICKER_YEAR_RE.match(seg)
+            if m:
+                out.add(m.group(1) or f"20{m.group(2)}")
+    return out
+
+
+# "no change" / "unchanged" is a rate-hold outcome, not a negation of the question
+HOLD_RE = re.compile(r"\bno (?:rate )?change\b|\bunchanged\b|\bleave rates? (?:steady|unchanged)\b", re.I)
+HOLD_SYNONYMS = "maintain maintains hold rate"
+
+DISTRICT_RE = re.compile(r"\b([A-Z]{2})-(\d{1,2}|AL)\b")
+# Kalshi contracts that pay on an announcement are not the event itself (e.g. "announce an IPO" vs "IPO")
+ANNOUNCE_WORDS = {"announce", "announces", "announced", "confirm", "confirms", "confirmed"}
+
+
+def districts(text: str) -> set[str]:
+    return {f"{s}{int(d):02d}" if d.isdigit() else f"{s}{d}" for s, d in DISTRICT_RE.findall(text)}
+
+
+PARTIES = {
+    "republican": {"republican", "republicans", "gop"},
+    "democrat": {"democrat", "democrats", "democratic"},
+}
+
+
+def parties(text: str) -> set[str]:
+    words = set(re.findall(r"[a-z]+", text.lower()))
+    return {p for p, ws in PARTIES.items() if words & ws}
+
+
+def _deadline_equivalent(q_days: set, k_days: set, title: str, khead: str) -> bool:
+    """'by Oct 31' (end of day) pays the same as 'before Nov 1'."""
+    if not re.search(r"\bby\b", title, re.I) or not re.search(r"\bbefore\b", khead, re.I):
+        return False
+    from datetime import date, timedelta
+    q_years, k_years = years(title), years(khead)
+    for mon, d in k_days:
+        try:
+            prev = date(2001, MONTHS.index(next(m for m in MONTHS if m.startswith(mon))) + 1, d) - timedelta(days=1)
+        except (ValueError, StopIteration):
+            continue
+        if (MONTHS[prev.month - 1][:3], prev.day) not in q_days:
+            continue
+        # "before Jan 1, 2027" is "by Dec 31, 2026": the question's year must be the earlier one
+        if (mon, d) == ("jan", 1):
+            # crossing a year boundary: only trust it when the question states the year
+            if not (q_years and k_years and ({str(int(y) - 1) for y in k_years} & q_years)):
+                continue
+        elif q_years and k_years and not (q_years & k_years):
+            continue
+        return True
+    return False
 
 
 def months(text: str, close_time: str = "") -> set[str]:
@@ -431,6 +516,14 @@ class MarketMapper:
         oc = outcome.strip()
         named = oc.lower() not in YES_NO and bool(oc)
         query = f"{title} {oc}" if named else title
+        is_hold = bool(HOLD_RE.search(title))
+        if is_hold:
+            query = f"{query} {HOLD_SYNONYMS}"
+        q_parties = parties(title)
+        q_districts = districts(title)
+        q_words = set(re.findall(r"[a-z]+", title.lower()))
+        q_events = event_types(title)
+        q_region = REGION_RE.search(title)
         hits = self.index.search(query, k=15)
         if not hits:
             return None, reasons + ["no lexical overlap with any Kalshi market"]
@@ -443,7 +536,7 @@ class MarketMapper:
         strict = domain in ("weather", "crypto")  # location/asset must match exactly
         q_proper = {e for e in entities(title) if e[:3] not in {m[:3] for m in MONTHS}} - {"will"}
         q_ents = entities(title) | (entities(oc) if named else set())
-        q_neg = bool(NEGATIONS & set(re.findall(r"[a-z']+", title.lower())))
+        q_neg = bool(NEGATIONS & set(re.findall(r"[a-z']+", HOLD_RE.sub("hold", title).lower())))
         oc_toks = set(tokens(oc)) if named else set()
 
         scored, vetoed = [], []
@@ -464,8 +557,10 @@ class MarketMapper:
             veto = []
             if q_years:
                 head_years = years(khead)
-                k_years = head_years or years(ktext)  # the title's year wins over rules boilerplate
-                if not (q_years & k_years):
+                # the title's year wins over rules boilerplate; else the ticker's year, else the rules
+                k_years = head_years or ticker_years(c.event_ticker, c.ticker) or years(ktext)
+                year_boundary_deadline = bool(q_days) and _deadline_equivalent(q_days, days(khead), title, khead)
+                if not (q_years & k_years) and not year_boundary_deadline:
                     veto.append(f"year {sorted(q_years)} vs {sorted(k_years)}")
                 elif q_years & head_years:
                     pen -= 0.05  # year stated in the contract title itself: small bonus
@@ -478,10 +573,33 @@ class MarketMapper:
             k_rank = rank(khead)
             if q_rank != k_rank:
                 veto.append(f"rank {q_rank} vs {k_rank}")
+            deadline_eq = False
             if q_days:
                 k_days = days(khead)
-                if k_days and not (q_days & k_days):
+                deadline_eq = bool(k_days) and not (q_days & k_days) and _deadline_equivalent(q_days, k_days, title, khead)
+                if k_days and not (q_days & k_days) and not deadline_eq:
                     veto.append(f"date {sorted(q_days)} vs {sorted(k_days)}")
+            if q_districts:
+                k_districts = districts(khead) | {seg for seg in c.ticker.upper().split("-")}
+                if not (q_districts & k_districts):
+                    veto.append(f"district {sorted(q_districts)} not in contract")
+            k_words = set(re.findall(r"[a-z]+", khead.lower()))
+            # judge by the payout rule, not the headline ("Will it be confirmed that..." is just phrasing)
+            rule_head = c.rules[:240].lower()
+            rule_words = set(re.findall(r"[a-z]+", rule_head))
+            announce_only = bool(rule_words & ANNOUNCE_WORDS) and not re.search(r"\beither\b|\bor (?:has )?actually\b", rule_head)
+            if announce_only and not (q_words & ANNOUNCE_WORDS):
+                veto.append("contract pays on an announcement, question on the event")
+            k_events = event_types(khead)
+            if (q_events or k_events) and q_events != k_events:
+                veto.append(f"event {sorted(q_events)} vs {sorted(k_events)}")
+            hold_contract = is_hold and re.search(r"\b0\s*bps\b", khead.lower())
+            if "bps" in k_words and not q_nums and not hold_contract:
+                veto.append("contract specifies a move size the question does not")
+            if q_region and not set(tokens(q_region.group(1))) <= set(tokens(khead)):
+                veto.append(f"regional result '{q_region.group(1)}' vs contract")
+            if ("final" in q_words) != ("final" in k_words):
+                veto.append("'final' scope differs")
             if strict and q_proper - set(tokens(khead)) - entities(khead):
                 veto.append(f"place/asset {sorted(q_proper - set(tokens(khead)) - entities(khead))} not in contract")
             if q_nums:
@@ -493,7 +611,7 @@ class MarketMapper:
                 vetoed.append(f"{c.ticker} vetoed ({'; '.join(veto)})")
                 continue
             # Soft penalties.
-            if q_months and not (q_months & months(f"{khead} {c.rules}", c.close_time)):
+            if q_months and not deadline_eq and not (q_months & months(f"{khead} {c.rules}", c.close_time)):
                 pen += 0.20
                 notes.append(f"month mismatch {sorted(q_months)}")
             k_neg = bool(NEGATIONS & set(re.findall(r"[a-z']+", c.title.lower())))
@@ -502,7 +620,8 @@ class MarketMapper:
                 notes.append("negation mismatch")
             if self.index.siblings[c.event_ticker] > 1 and c.yes_sub_title:
                 sub_toks = set(tokens(c.yes_sub_title)) - {"party", "yes"}
-                if sub_toks and not (sub_toks & set(tokens(query))):
+                party_market = bool(q_parties) and bool(q_parties & parties(f"{c.title} {c.event_title}"))
+                if sub_toks and not (sub_toks & set(tokens(query))) and not party_market:
                     pen += 0.35
                     notes.append(f"sibling outcome '{c.yes_sub_title}' not named in question")
             side = "yes"
