@@ -70,6 +70,7 @@ python -m copytrader -c config.json replay --hours 72      # push recent real fi
 python -m copytrader -c config.json run                    # DRY RUN: stream, map, size, log
 python -m copytrader -c config.json report                 # review planned orders
 python -m copytrader -c config.json verify-ledger          # check the hash chain
+python -m copytrader -c config.json dashboard --out data/dashboard.html   # phone-friendly review page
 ```
 
 ### Going live (deliberately hard)

@@ -1,0 +1,261 @@
+<title>Kalshi Copy Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: single trading-blotter column, order tickets stacked, summary before detail. */
+:root {
+  --paper: #EEF0F4; --surface: #FFFFFF; --ink: #161B26; --muted: #5C6578; --rule: #D5DAE3;
+  --accent: #2747A8; --accent-soft: #E3E8F7;
+  --yes: #0E7A62; --yes-soft: #DDF1EB; --no: #B0344A; --no-soft: #F7E1E5; --warn: #9A600C; --warn-soft: #F8ECD8;
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #10131A; --surface: #181D27; --ink: #E7EAF1; --muted: #98A1B4; --rule: #29303E;
+  --accent: #93A9F2; --accent-soft: #222B44;
+  --yes: #52C7A6; --yes-soft: #15302A; --no: #F27E91; --no-soft: #3A1E25; --warn: #E3AA52; --warn-soft: #362A15;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --paper: #10131A; --surface: #181D27; --ink: #E7EAF1; --muted: #98A1B4; --rule: #29303E;
+  --accent: #93A9F2; --accent-soft: #222B44;
+  --yes: #52C7A6; --yes-soft: #15302A; --no: #F27E91; --no-soft: #3A1E25; --warn: #E3AA52; --warn-soft: #362A15;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.5 var(--f-body); }
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; display: grid; gap: 28px; }
+h1, h2 { font-family: var(--f-display); font-stretch: 80%; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h1 { font-size: clamp(30px, 8vw, 44px); font-weight: 800; line-height: 1.02; }
+h2 { font-size: 20px; font-weight: 700; }
+.eyebrow { font: 600 11px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--f-mono); }
+
+header { display: grid; gap: 10px; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { font: 600 12px/1 var(--f-mono); padding: 7px 10px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); letter-spacing: .02em; }
+.pill.ok { background: var(--yes-soft); color: var(--yes); }
+.pill.bad { background: var(--no-soft); color: var(--no); }
+.pill.plain { background: var(--accent-soft); color: var(--accent); }
+
+.tabs { display: flex; gap: 4px; padding: 4px; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; }
+.tabs button { flex: 1; min-width: 0; font: 600 14px/1.2 var(--f-body); color: var(--muted); background: none; border: 0; border-radius: 9px; padding: 10px 8px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--surface); }
+.tabs button:focus-visible, .chips button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+section { display: grid; gap: 12px; }
+.sec-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+
+.funnel { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--rule); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.step { padding: 14px 12px; display: grid; gap: 2px; min-width: 0; }
+.step + .step { border-left: 1px solid var(--rule); }
+.step b { font: 700 26px/1.1 var(--f-display); font-stretch: 85%; font-variant-numeric: tabular-nums; }
+.step .lbl { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.step .rate { font: 500 11px/1.2 var(--f-mono); color: var(--accent); }
+.step:last-child b { color: var(--accent); }
+@media (max-width: 520px) {
+  .funnel { grid-template-columns: 1fr 1fr; }
+  .step:nth-child(3) { border-left: 0; }
+  .step:nth-child(n+3) { border-top: 1px solid var(--rule); }
+}
+
+.totals { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; }
+.totals span b { font-family: var(--f-mono); font-weight: 600; }
+
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chips button { font: 600 13px/1 var(--f-body); padding: 8px 12px; border-radius: 999px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+.chips button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+.tickets { display: grid; gap: 10px; }
+.ticket { background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.t-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.t-order { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.t-order .verb { font: 800 18px/1 var(--f-display); font-stretch: 85%; }
+.side { font: 700 12px/1 var(--f-mono); padding: 5px 7px; border-radius: 6px; }
+.side.yes { background: var(--yes-soft); color: var(--yes); }
+.side.no { background: var(--no-soft); color: var(--no); }
+.t-cost { text-align: right; font-family: var(--f-mono); font-size: 15px; font-weight: 600; white-space: nowrap; }
+.t-cost small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+.ticker { font: 500 12px/1.4 var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+.pair { display: grid; gap: 6px; border-top: 1px dashed var(--rule); padding-top: 10px; }
+.pair div { display: grid; grid-template-columns: 74px 1fr; gap: 8px; font-size: 14px; line-height: 1.4; }
+.pair div > span:first-child { font: 600 10px/1.9 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.t-foot { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+.meter { display: inline-flex; align-items: center; gap: 6px; }
+.meter i { display: inline-block; width: 46px; height: 5px; border-radius: 3px; background: var(--rule); overflow: hidden; }
+.meter i::after { content: ""; display: block; height: 100%; width: var(--w); background: var(--accent); }
+
+.empty { background: var(--surface); border: 1px dashed var(--rule); border-radius: 14px; padding: 18px; color: var(--muted); }
+
+.skips { display: grid; gap: 12px; background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 14px; }
+.skip { display: grid; gap: 4px; }
+.skip-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.skip-row b { font-family: var(--f-mono); font-weight: 600; }
+.bar { height: 6px; border-radius: 3px; background: var(--paper); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--muted); opacity: .55; }
+.skip small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.leaders { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; }
+.leaders li { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; padding: 10px 14px; align-items: center; font-size: 14px; }
+.leaders li + li { border-top: 1px solid var(--rule); }
+.leaders .r { font: 600 12px var(--f-mono); color: var(--muted); }
+.leaders .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaders .p { font: 600 13px var(--f-mono); color: var(--yes); }
+
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+code { font: 13px var(--f-mono); background: var(--accent-soft); color: var(--accent); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.chain { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Polymarket leaders → Kalshi mirror</div>
+    <h1>Kalshi Copy Desk</h1>
+    <div class="pills" id="pills"></div>
+  </header>
+
+  <div class="tabs" role="tablist" id="tabs"></div>
+
+  <section aria-labelledby="h-flow">
+    <div class="sec-head"><h2 id="h-flow">Signal flow</h2><span class="muted num" id="window"></span></div>
+    <div class="funnel" id="funnel"></div>
+    <div class="totals" id="totals"></div>
+  </section>
+
+  <section aria-labelledby="h-orders">
+    <div class="sec-head">
+      <h2 id="h-orders">Planned orders</h2>
+      <div class="chips" id="chips">
+        <button type="button" data-f="all" aria-pressed="true">All</button>
+        <button type="button" data-f="open" aria-pressed="false">Buys</button>
+        <button type="button" data-f="reduce" aria-pressed="false">Sells</button>
+      </div>
+    </div>
+    <div class="tickets" id="tickets"></div>
+  </section>
+
+  <section aria-labelledby="h-skips">
+    <h2 id="h-skips">Why signals were skipped</h2>
+    <div class="skips" id="skips"></div>
+  </section>
+
+  <section aria-labelledby="h-leaders">
+    <div class="sec-head"><h2 id="h-leaders">Tracked traders</h2><span class="muted" id="cat"></span></div>
+    <ul class="leaders" id="leaders"></ul>
+  </section>
+
+  <section aria-labelledby="h-live">
+    <h2 id="h-live">Before real money</h2>
+    <ol class="steps">
+      <li>Read the orders above and check that each Polymarket question and Kalshi contract pay out on the same thing.</li>
+      <li>Add Kalshi API keys (<code>KALSHI_API_KEY_ID</code>, <code>KALSHI_PRIVATE_KEY_PATH</code>) and test on Kalshi's demo exchange.</li>
+      <li>Live mode needs all three: <code>"dry_run": false</code>, the <code>--live</code> flag, and <code>COPYTRADER_LIVE_CONFIRM=I_ACCEPT_REAL_MONEY_RISK</code>.</li>
+    </ol>
+    <p class="chain" id="chain"></p>
+  </section>
+</div>
+
+<script>
+const DATA = __DATA__;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const usd = (n, d = 2) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const big = (n) => n >= 1e6 ? "$" + (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? "$" + (n / 1e3).toFixed(1) + "k" : usd(n, 0);
+const pct = (a, b) => b ? Math.round((a / b) * 100) + "%" : "–";
+const when = (ts) => ts ? ts.replace("T", " ").replace("Z", "").slice(5, 16) : "";
+let cur = 0, filter = "all";
+
+function store(k, v) { try { v === undefined ? (v = localStorage.getItem(k)) : localStorage.setItem(k, v); } catch (e) { return null; } return v; }
+
+function render() {
+  const s = DATA.sources[cur];
+  if (!s) { $("tickets").innerHTML = '<div class="empty">No ledger data yet.</div>'; return; }
+  const live = s.meta.mode === "LIVE";
+  $("pills").innerHTML =
+    `<span class="pill ${live ? "bad" : ""}">${live ? "LIVE · real money" : "DRY RUN · no real money"}</span>` +
+    `<span class="pill ${s.chain.ok ? "ok" : "bad"}">${s.chain.ok ? "Ledger intact" : "Ledger tampered"}</span>` +
+    `<span class="pill plain">Updated ${esc(DATA.generated)}</span>`;
+  $("window").textContent = `${when(s.meta.first)} → ${when(s.meta.last)} UTC`;
+
+  const f = s.funnel;
+  const steps = [
+    ["Leader fills", f.fills, null],
+    ["Signals after grouping", f.signals, null],
+    ["Matched on Kalshi", f.matched, pct(f.matched, f.signals) + " of signals"],
+    ["Planned orders", f.orders, pct(f.orders, f.matched) + " of matches"],
+  ];
+  $("funnel").innerHTML = steps.map(([l, n, r]) =>
+    `<div class="step"><b>${n.toLocaleString()}</b><span class="lbl">${l}</span>${r ? `<span class="rate">${r}</span>` : ""}</div>`).join("");
+
+  const buys = s.orders.filter((o) => o.action === "open");
+  const spend = buys.reduce((a, o) => a + o.cost + o.fee, 0);
+  const fees = s.orders.reduce((a, o) => a + o.fee, 0);
+  const mkts = new Set(s.orders.map((o) => o.ticker)).size;
+  $("totals").innerHTML =
+    `<span>Paper spend <b>${usd(spend)}</b></span><span>Fees <b>${usd(fees)}</b></span>` +
+    `<span>Markets <b>${mkts}</b></span><span>Buys / sells <b>${buys.length} / ${s.orders.length - buys.length}</b></span>`;
+
+  const list = s.orders.filter((o) => filter === "all" || o.action === filter);
+  $("tickets").innerHTML = list.length ? list.map(ticket).join("") :
+    `<div class="empty">${s.orders.length ? "No orders match this filter." :
+      "No orders yet. The engine is watching; tracked traders haven't made a matching election or macro trade in this window."}</div>`;
+
+  const max = Math.max(1, ...s.skips.map((k) => k.count));
+  $("skips").innerHTML = s.skips.length ? s.skips.map((k) =>
+    `<div class="skip"><div class="skip-row"><span>${esc(k.label)}</span><b>${k.count}</b></div>` +
+    `<div class="bar"><i style="width:${(k.count / max) * 100}%"></i></div>` +
+    `<small>e.g. ${esc(k.example)}</small></div>`).join("") : '<span class="muted">Nothing skipped yet.</span>';
+
+  $("cat").textContent = s.meta.category ? `${s.meta.category} leaderboard, last 30 days` : "";
+  $("leaders").innerHTML = s.leaders.map((l) =>
+    `<li><span class="r">#${l.rank}</span><span class="n">${esc(l.name)}</span><span class="p">+${big(l.pnl)}</span></li>`).join("");
+  $("chain").innerHTML = s.chain.ok
+    ? `Ledger <span class="mono">${esc(s.file)}</span>: ${s.chain.records.toLocaleString()} records, hash chain verified. Head <span class="mono">${esc(s.chain.head.slice(0, 16))}…</span>`
+    : `Ledger check failed: ${esc(s.chain.error)}`;
+}
+
+function ticket(o) {
+  const buy = o.action === "open";
+  const leaderVerb = o.leader_side === "BUY" ? "bought" : "sold";
+  return `<article class="ticket">
+    <div class="t-top">
+      <div class="t-order"><span class="verb">${buy ? "BUY" : "SELL"} ${o.count}</span>
+        <span class="side ${o.side}">${o.side.toUpperCase()}</span>
+        <span class="mono num">@ ${o.limit.toFixed(2)}</span></div>
+      <div class="t-cost">${usd(o.cost)}<small>+ ${usd(o.fee)} fee</small></div>
+    </div>
+    <div class="ticker">${esc(o.ticker)}</div>
+    <div class="pair">
+      <div><span>Leader</span><span><b>${esc(o.leader)}</b> ${leaderVerb} <b>${esc(o.outcome)}</b> at ${o.leader_price.toFixed(2)} · ${big(o.leader_usdc)} in ${o.fills} fill${o.fills > 1 ? "s" : ""}</span></div>
+      <div><span>Polymkt</span><span>${esc(o.question)}</span></div>
+      <div><span>Kalshi</span><span>${esc(o.kalshi_title)}</span></div>
+    </div>
+    <div class="t-foot">
+      <span class="meter">Match ${o.method === "override" ? "pinned" : Math.min(1, o.score).toFixed(2)} <i style="--w:${Math.min(1, o.score) * 100}%"></i></span>
+      ${o.conviction != null ? `<span>Conviction ${Math.round(o.conviction * 100)}%</span>` : ""}
+      <span>${when(o.ts)} UTC</span>
+    </div>
+  </article>`;
+}
+
+function setTab(i) {
+  cur = i; store("cd-tab", String(i));
+  [...$("tabs").children].forEach((b, j) => b.setAttribute("aria-selected", j === i ? "true" : "false"));
+  render();
+}
+
+$("tabs").innerHTML = DATA.sources.map((s, i) => `<button type="button" role="tab" id="tab-${i}">${esc(s.name)}</button>`).join("");
+[...$("tabs").children].forEach((b, i) => b.addEventListener("click", () => setTab(i)));
+$("tabs").hidden = DATA.sources.length < 2;
+$("chips").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  filter = b.dataset.f;
+  [...$("chips").children].forEach((c) => c.setAttribute("aria-pressed", c === b ? "true" : "false"));
+  render();
+});
+const saved = Number(store("cd-tab"));
+setTab(Number.isInteger(saved) && saved < DATA.sources.length ? saved : 0);
+</script>

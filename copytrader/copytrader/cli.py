@@ -102,6 +102,15 @@ def cmd_replay(args, cfg) -> int:
     return 0
 
 
+def cmd_dashboard(args, cfg) -> int:
+    from .dashboard import render
+
+    sources = [(p, n) for p, n in zip(args.ledger, args.name or [])] if args.name else \
+        [(p, os.path.basename(p)) for p in (args.ledger or [cfg.ledger_path])]
+    print(render(sources, args.out))
+    return 0
+
+
 def cmd_verify(args, cfg) -> int:
     path = args.ledger or cfg.ledger_path
     res = ledger_mod.verify(path)
@@ -146,6 +155,10 @@ def main(argv=None) -> int:
     rep = sub.add_parser("replay", help="dry-run the leaders' recent fills through the pipeline")
     rep.add_argument("--hours", type=float, default=24)
     rep.add_argument("--ledger")
+    d = sub.add_parser("dashboard", help="render ledger(s) into a phone-friendly HTML page")
+    d.add_argument("--ledger", action="append", help="ledger path (repeatable)")
+    d.add_argument("--name", action="append", help="tab name for each --ledger, in order")
+    d.add_argument("--out", default="data/dashboard.html")
     v = sub.add_parser("verify-ledger", help="verify the hash chain")
     v.add_argument("--ledger")
     rp = sub.add_parser("report", help="summarise planned/executed orders from the ledger")
@@ -162,7 +175,8 @@ def main(argv=None) -> int:
             if not os.path.isabs(val):
                 setattr(cfg, attr, os.path.join(base, val))
     handlers = {"run": cmd_run, "leaderboard": cmd_leaderboard, "map": cmd_map,
-                "verify-ledger": cmd_verify, "report": cmd_report, "replay": cmd_replay}
+                "verify-ledger": cmd_verify, "report": cmd_report, "replay": cmd_replay,
+                "dashboard": cmd_dashboard}
     return handlers[args.cmd](args, cfg)
 
 
