@@ -1,0 +1,44 @@
+{
+  "dry_run": true,
+  "ledger_path": "data/ledger.jsonl",
+  "state_path": "data/state.json",
+  "log_level": "INFO",
+  "polymarket": {
+    "leaderboard_category": "OVERALL",
+    "leaderboard_period": "MONTH",
+    "leaderboard_order_by": "PNL",
+    "top_n": 20,
+    "use_websocket": true,
+    "poll_interval_s": 15,
+    "position_poll_interval_s": 120,
+    "min_leader_usdc": 250,
+    "aggregation_window_s": 20,
+    "signal_max_age_s": 300,
+    "extra_wallets": []
+  },
+  "mapping": {
+    "kalshi_categories": ["Elections", "Politics", "Economics", "Financials"],
+    "min_score": 0.55,
+    "min_margin": 0.05,
+    "overrides_path": "mapping_overrides.json"
+  },
+  "kalshi": {
+    "env": "demo"
+  },
+  "risk": {
+    "bankroll_fraction": 0.02,
+    "conviction_ref_usdc": 10000,
+    "min_conviction": 0.25,
+    "max_order_usd": 50,
+    "max_market_exposure_usd": 150,
+    "max_daily_usd": 300,
+    "max_open_positions": 15,
+    "slippage": 0.02,
+    "max_divergence": 0.08,
+    "min_price": 0.04,
+    "max_price": 0.96,
+    "mirror_exits": true,
+    "paper_balance_usd": 1000,
+    "time_in_force": "immediate_or_cancel"
+  }
+}

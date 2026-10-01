@@ -1,0 +1,15 @@
+{
+  "_comment": "Pin Polymarket markets to Kalshi tickers. Keys: Polymarket conditionId (preferred) or market slug. 'invert': true flips YES<->NO. For named outcomes use 'outcomes': {\"Up\": \"yes\", \"Down\": \"no\"}.",
+  "condition_id": {
+    "0x0000000000000000000000000000000000000000000000000000000000000000": {
+      "ticker": "KXFEDDECISION-26OCT-C25",
+      "note": "Fed cuts 25bp at Oct 2026 meeting"
+    }
+  },
+  "slug": {
+    "example-polymarket-slug": {
+      "ticker": "KXEXAMPLE-26-TICKER",
+      "outcomes": {"Up": "yes", "Down": "no"}
+    }
+  }
+}
