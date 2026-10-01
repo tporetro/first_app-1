@@ -85,13 +85,19 @@ class KalshiClient:
         key_path = os.environ.get(cfg.private_key_path_env)
         key_pem = os.environ.get("KALSHI_PRIVATE_KEY")  # PEM text, for hosts that only take env secrets
         if key_id and (key_pem or key_path):
-            if key_pem:
-                pem = key_pem.replace("\\n", "\n").encode()
-            else:
-                with open(os.path.expanduser(key_path), "rb") as fh:
-                    pem = fh.read()
-            self.signer = Signer(key_id, pem)
-            log.info("Kalshi credentials loaded (%s key, %s)", self.signer.kind, cfg.env)
+            try:
+                if key_pem:
+                    pem = key_pem.replace("\\n", "\n").encode()
+                else:
+                    with open(os.path.expanduser(key_path), "rb") as fh:
+                        pem = fh.read()
+                self.signer = Signer(key_id, pem)
+                log.info("Kalshi credentials loaded (%s key, %s)", self.signer.kind, cfg.env)
+            except Exception as e:  # noqa: BLE001 - a bad key must not take the service down
+                self.signer = None
+                log.error("Kalshi credentials could not be loaded (%s: %s); running unauthenticated "
+                          "on paper balance. Re-check KALSHI_PRIVATE_KEY / KALSHI_API_KEY_ID.",
+                          type(e).__name__, e)
 
     @property
     def authenticated(self) -> bool:
