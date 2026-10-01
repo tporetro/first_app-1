@@ -28,3 +28,14 @@ def test_signature_over_ts_method_path_without_query(kind):
                                                       salt_length=padding.PSS.DIGEST_LENGTH),
                                 hashes.SHA256())
     assert h["KALSHI-ACCESS-KEY"] == "kid"
+
+
+def test_bad_private_key_does_not_crash(monkeypatch, caplog):
+    from copytrader.config import KalshiConfig
+    from copytrader.kalshi import KalshiClient
+
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", "-----BEGIN PRIVATE KEY-----\ngarbage\n-----END PRIVATE KEY-----")
+    client = KalshiClient(KalshiConfig())
+    assert client.authenticated is False
+    assert "could not be loaded" in caplog.text
