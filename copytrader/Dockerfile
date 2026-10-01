@@ -8,4 +8,4 @@ COPY config.server.json ./
 RUN mkdir -p /data
 EXPOSE 8080
 # Dry-run unless config, --live AND COPYTRADER_LIVE_CONFIRM all say otherwise.
-CMD ["python", "-m", "copytrader", "-c", "config.server.json", "serve"]
+CMD ["python", "-m", "copytrader", "-c", "config.server.json", "serve", "--live"]
