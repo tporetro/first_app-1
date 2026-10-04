@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "purple-flea-casino": {
+      "command": "npx",
+      "args": ["-y", "@purpleflea/casino-mcp"],
+      "env": {
+        "PURPLE_FLEA_URL": "https://casino.purpleflea.com",
+        "PURPLE_FLEA_API_KEY": "${PURPLE_FLEA_API_KEY:-}"
+      }
+    }
+  }
+}
