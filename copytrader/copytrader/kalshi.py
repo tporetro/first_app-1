@@ -47,10 +47,12 @@ class KalshiClient:
             return r.json()
         r.raise_for_status()
 
-    def open_markets(self, max_pages=20):
+    def open_markets(self, max_pages=20, exclude_parlays=False, max_close_ts=None):
         out, cursor = [], None
         for _ in range(max_pages):
-            p = {"status": "open", "limit": 1000, **({"cursor": cursor} if cursor else {})}
+            p = {"status": "open", "limit": 1000, **({"cursor": cursor} if cursor else {}),
+                 **({"mve_filter": "exclude"} if exclude_parlays else {}),
+                 **({"max_close_ts": int(max_close_ts)} if max_close_ts else {})}
             d = self._req("GET", "/markets", params=p)
             out += d.get("markets", [])
             cursor = d.get("cursor")

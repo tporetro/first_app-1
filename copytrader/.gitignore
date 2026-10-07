@@ -4,3 +4,4 @@ ledger/
 state/
 __pycache__/
 .pytest_cache/
+lab.db

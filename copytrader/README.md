@@ -32,3 +32,21 @@ Needs Kalshi API credentials (start with the DEMO base URL), `--live`, AND
   or sports bettors. Sports outcomes (team names) are skipped; only YES/NO copied.
 - Same-looking markets can resolve differently. Always spot-check matches in the ledger.
 - Polymarket and Kalshi availability/legality depends on your jurisdiction.
+
+---
+
+# Signal lab: recorder + blind AI forecaster
+
+    python lab_cli.py record      # snapshot Kalshi (liquid, <7d, no parlays) + Polymarket + top-wallet fills; settle resolved
+    python lab_cli.py loop        # record every 5 min (run under pm2/systemd on the server)
+    ANTHROPIC_API_KEY=... python lab_cli.py forecast --limit 10 --budget 2
+    python lab_cli.py score       # AI vs market: Brier, log loss, calibration, paper PnL after fees
+
+How to read it honestly:
+- The forecaster is **blind**: Claude (web search on) never sees the market price, so its
+  probability is an independent signal. `score` compares its Brier score to the market's.
+  `ai_beats_market: true` over a few hundred resolved markets is the first real evidence of edge.
+- Paper PnL buys at the ask / sells at the bid minus a 2c friction, only when |AI - market| >= 5c.
+- `--budget` hard-caps API spend per run; default model `claude-opus-5-5` (override with
+  `FORECAST_MODEL`, e.g. a cheaper model for wide sweeps). Cost per forecast is stored per row.
+- Nothing here places orders.
