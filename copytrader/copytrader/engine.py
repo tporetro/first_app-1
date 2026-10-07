@@ -4,7 +4,7 @@ from .risk import Risk
 
 
 class Engine:
-    def __init__(self, cfg, poly, kalshi, mapper_factory, ledger=None):
+    def __init__(self, cfg, poly, kalshi, mapper_factory, ledger=None, sports=None):
         self.cfg, self.poly, self.kalshi = cfg, poly, kalshi
         self.mapper_factory = mapper_factory
         self.ledger = ledger or Ledger(cfg.ledger_path)
@@ -12,6 +12,7 @@ class Engine:
         self.live = cfg.live_allowed()
         self.seen = self._load_seen()
         self.mapper = None
+        self.sports = sports
 
     def _load_seen(self):
         p = self.cfg.state_path
@@ -66,12 +67,19 @@ class Engine:
             return skip("source fill too small")
         if now - tr["ts"] > c.max_signal_age_s:
             return skip("signal stale")
-        if tr["outcome"].lower() not in ("yes", "no"):
-            return skip("non yes/no outcome")
-        market, score = self.mapper.match(tr["title"], tr["condition_id"])
-        if not market:
-            return skip("no confident Kalshi match", best_score=round(score, 3))
-        side = tr["outcome"].lower()
+        if tr["outcome"].lower() in ("yes", "no"):
+            market, score = self.mapper.match(tr["title"], tr["condition_id"])
+            if not market:
+                return skip("no confident Kalshi match", best_score=round(score, 3))
+            side = tr["outcome"].lower()
+        elif self.sports:
+            # team-name outcome: buying team T == YES on Kalshi's "T wins"
+            market, score, why = self.sports.match(tr["title"], tr["slug"], tr["outcome"])
+            if not market:
+                return skip(f"sports: {why}")
+            side = "yes"
+        else:
+            return skip("non yes/no outcome (sports disabled)")
         from .kalshi import _cents
         ask = _cents(self.kalshi.market(market["ticker"]), "yes_ask" if side == "yes" else "no_ask")
         if ask is None:

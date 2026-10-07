@@ -83,3 +83,52 @@ def test_live_requires_confirm(monkeypatch):
     assert not Config(live=True).live_allowed()
     monkeypatch.setenv("KALSHI_LIVE_CONFIRM", "YES_SEND_REAL_ORDERS")
     assert Config(live=True).live_allowed() and not Config(live=False).live_allowed()
+
+
+# ---- sports ----
+from copytrader.sports import SportsMapper, parse_slug, event_date
+from datetime import date
+
+def _g(ev, a, b):
+    return [{"ticker": f"{ev}-{x[:3].upper()}", "event_ticker": ev, "yes_sub_title": x, "yes_ask": 55, "no_ask": 46} for x in (a, b)]
+
+SER = {"KXNCAAFGAME": _g("KXNCAAFGAME-26OCT07JXSTKENN", "Jacksonville State", "Kennesaw State")
+                    + _g("KXNCAAFGAME-26OCT07MOSUDEL", "Missouri St.", "Delaware"),
+       "KXNBAGAME": _g("KXNBAGAME-26OCT13GSWLAL", "Golden State", "Los Angeles L")
+                    + _g("KXNBAGAME-26OCT13LACPOR", "Los Angeles C", "Portland"),
+       "KXMLBGAME": _g("KXMLBGAME-26OCT071800LADATL", "Los Angeles D", "Atlanta")}
+
+def sm(): return SportsMapper(lambda s: SER.get(s, []))
+
+def test_slug_and_event_date():
+    assert parse_slug("cfb-jaxst-kenest-2026-10-07") == ("cfb", date(2026, 10, 7))
+    assert event_date("KXMLBGAME-26OCT071800LADATL") == date(2026, 10, 7)
+
+def test_sports_college_and_pro():
+    mk, _, _ = sm().match("Jacksonville State vs. Kennesaw State", "cfb-jaxst-kenest-2026-10-07", "Kennesaw State")
+    assert mk["yes_sub_title"] == "Kennesaw State"
+    mk, _, _ = sm().match("Missouri State vs. Delaware", "cfb-mosu-del-2026-10-07", "Missouri State")
+    assert mk["yes_sub_title"] == "Missouri St."
+    mk, _, _ = sm().match("Lakers vs. Warriors", "nba-lal-gsw-2026-10-13", "Lakers")
+    assert mk["yes_sub_title"] == "Los Angeles L"          # not Clippers
+    mk, _, _ = sm().match("Los Angeles Dodgers vs. Atlanta Braves", "mlb-lad-atl-2026-10-07", "Dodgers")
+    assert mk["yes_sub_title"] == "Los Angeles D"
+
+def test_sports_rejects_wrong_game_and_props():
+    s = sm()
+    assert s.match("Clippers vs. Warriors", "nba-lac-gsw-2026-10-13", "Clippers")[0] is None  # no such game
+    assert s.match("Lakers vs. Warriors", "nba-lal-gsw-2026-11-30", "Lakers")[0] is None      # wrong date
+    assert s.match("Spread: Lakers (-3.5)", "nba-lal-gsw-2026-10-13", "Lakers")[0] is None
+    assert s.match("Lakers vs. Warriors", "nba-lal-gsw-2026-10-13", "Over")[0] is None
+    assert s.match("Team A vs. Team B", "soccer-a-b-2026-10-13", "Team A")[0] is None
+
+def test_engine_copies_sports_dry_run(tmp_path):
+    cfg = Config(ledger_path=str(tmp_path / "l.jsonl"), state_path=str(tmp_path / "s.json"))
+    poly = FakePoly([])
+    eng = Engine(cfg, poly, FakeKalshi(), lambda: Mapper(KM), sports=sm())
+    eng.start()
+    poly.t = [tr(id="s1:a", title="Jacksonville State vs. Kennesaw State", outcome="Kennesaw State",
+                 slug="cfb-jaxst-kenest-2026-10-07", price=0.52)]
+    eng.tick(now=1010)
+    plans = [r for r in eng.ledger.records() if r["kind"] == "order_planned"]
+    assert plans and plans[0]["data"]["ticker"] == "KXNCAAFGAME-26OCT07JXSTKENN-KEN" and plans[0]["data"]["side"] == "yes"

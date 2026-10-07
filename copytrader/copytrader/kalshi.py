@@ -38,10 +38,14 @@ class KalshiClient:
                 "Content-Type": "application/json"}
 
     def _req(self, method, path, auth=False, **kw):
-        h = self._headers(method, path) if auth else {}
-        r = self.s.request(method, self.base + path, headers=h, timeout=15, **kw)
+        for attempt in range(5):
+            r = self.s.request(method, self.base + path, headers=self._headers(method, path) if auth else {},
+                               timeout=15, **kw)
+            if r.status_code == 429:               # rate limited: back off and retry
+                time.sleep(1.5 * (attempt + 1)); continue
+            r.raise_for_status()
+            return r.json()
         r.raise_for_status()
-        return r.json()
 
     def open_markets(self, max_pages=20):
         out, cursor = [], None
@@ -53,6 +57,10 @@ class KalshiClient:
             if not cursor:
                 break
         return out
+
+    def series_markets(self, series):
+        return self._req("GET", "/markets", params={"series_ticker": series, "status": "open",
+                                                    "limit": 1000}).get("markets", [])
 
     def market(self, ticker):
         return self._req("GET", f"/markets/{ticker}")["market"]
