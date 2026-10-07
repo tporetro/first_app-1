@@ -13,7 +13,7 @@ from copytrader.ledger import Ledger
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["record", "settle", "forecast", "score", "loop", "pairs", "decide", "fit", "evaluate", "daily", "route"])
+    ap.add_argument("cmd", choices=["record", "settle", "forecast", "score", "loop", "pairs", "decide", "fit", "evaluate", "daily", "route", "kalshi-check"])
     ap.add_argument("--db", default=os.getenv("LAB_DB", "lab.db"))
     ap.add_argument("--limit", type=int, default=int(os.getenv("FORECAST_LIMIT", "10")))
     ap.add_argument("--budget", type=float, default=float(os.getenv("FORECAST_BUDGET_USD", "2")), help="max USD of API spend per forecast run")
@@ -21,8 +21,8 @@ def main():
     ap.add_argument("--live", action="store_true", help="route: actually send orders (every other lock must also be open)")
     ap.add_argument("--demo-skip-gate", action="store_true", help="route: bypass the evidence gate on Kalshi DEMO only")
     a = ap.parse_args()
-    c = db.connect(a.db); base = os.getenv("KALSHI_BASE_URL", KALSHI_DEMO) if a.cmd == "route" else KALSHI_PROD
-    k = KalshiClient(base, os.getenv("KALSHI_KEY_ID", "") if a.cmd == "route" else "", os.getenv("KALSHI_PRIVATE_KEY_PATH", "") if a.cmd == "route" else ""); s = requests.Session(); p = PolymarketClient()
+    c = db.connect(a.db); base = os.getenv("KALSHI_BASE_URL", KALSHI_DEMO) if a.cmd in ("route", "kalshi-check") else KALSHI_PROD
+    k = KalshiClient(base, os.getenv("KALSHI_KEY_ID", "") if a.cmd in ("route", "kalshi-check") else "", os.getenv("KALSHI_PRIVATE_KEY_PATH", "") if a.cmd in ("route", "kalshi-check") else ""); s = requests.Session(); p = PolymarketClient()
 
     _ev = {}
     def event_title(t):
@@ -48,6 +48,19 @@ def main():
         import anthropic
         print(forecaster.run(c, anthropic.Anthropic(), a.limit, a.model, a.budget, event_title))
     elif a.cmd == "score": print(json.dumps(scoring.score(c), indent=1, default=str))
+    elif a.cmd == "kalshi-check":
+        import requests as rq
+        print("host:", base, "(DEMO, fake money)" if bridge.is_demo(base) else "(PRODUCTION, real money)")
+        if not k.authed:
+            raise SystemExit("No credentials loaded: set KALSHI_KEY_ID and KALSHI_PRIVATE_KEY_PATH in .env "
+                             "(and make sure the .pem file exists at that path).")
+        try:
+            print(f"OK - authenticated. Buying power: ${k.buying_power_usd():,.2f}")
+        except rq.HTTPError as e:
+            code = e.response.status_code
+            raise SystemExit(f"Kalshi rejected the request ({code}). "
+                             + ("401/403: key ID and private key don't match, or the key was made on a different "
+                                "site (demo keys only work on the demo host)." if code in (401, 403) else e.response.text[:200]))
     elif a.cmd == "route":
         print(json.dumps(bridge.route(c, k, base, Ledger("ledger/bridge.jsonl"), live=a.live,
                                        demo_skip_gate=a.demo_skip_gate), indent=1))

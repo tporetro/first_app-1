@@ -126,3 +126,21 @@ Test the plumbing with fake money first: set `KALSHI_BASE_URL` to the demo host,
 
 Going live on real money is intentionally manual: it takes a code-level decision to add `--live` to the pm2 job
 plus the three confirm variables above. Start with a tiny bankroll, and keep `touch KILL` in mind.
+
+---
+
+# Kalshi demo setup (fake money)
+
+1. Go to **demo.kalshi.co** (the demo site, a separate account from the real Kalshi) and sign up with any email.
+2. In the demo account's **Settings -> API Keys**, create a key. Kalshi shows the **Key ID** and lets you download the
+   **private key (.pem) once**; save it right away (it can't be shown again).
+3. Put the `.pem` on the server and lock it down:
+   `scp kalshi_demo_key.pem root@140.82.7.92:~/first_app-1/copytrader/ && chmod 600 kalshi_demo_key.pem` (never commit it; `*.pem` is gitignored).
+4. In `.env` set `KALSHI_KEY_ID`, `KALSHI_PRIVATE_KEY_PATH`, and `KALSHI_BASE_URL=https://demo-api.kalshi.co/trade-api/v2`.
+5. Verify: `.venv/bin/python lab_cli.py kalshi-check` -> should print `OK - authenticated. Buying power: $...`.
+   (The demo account comes with play money; if the balance is $0, add demo funds in the demo site's UI.)
+6. Test the full order path with fake money: `.venv/bin/python lab_cli.py route --live --demo-skip-gate`
+   (needs `KALSHI_LIVE_CONFIRM=YES_SEND_REAL_ORDERS` in the environment; the gate bypass works only on the demo host).
+
+Note: the demo exchange lists different/fewer markets than production and its prices are not real,
+so demo is for testing the plumbing, not for judging the strategy.
