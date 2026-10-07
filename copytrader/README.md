@@ -79,3 +79,27 @@ Kalshi's fee and slippage, are sized with 1/4 Kelly, and are capped at 2% of ban
 trades, combined Brier beats the market's, and the 5th-percentile bootstrap PnL is > 0.
 Until it says true, everything is paper. The tests check that a noise-only signal
 does NOT pass the gate and an informative one does.
+
+---
+
+# Deploy on the server with pm2
+
+    git pull && cd copytrader
+    bash deploy/setup_server.sh      # venv + deps + tests + pm2 start (re-runnable)
+    nano .env                        # set ANTHROPIC_API_KEY  (then: pm2 restart lab-forecast)
+    pm2 startup systemd -u root --hp /root   # run the command it prints, then: pm2 save
+
+| pm2 app | schedule | what it does |
+|---|---|---|
+| `lab-record` | always on (loops every 5 min) | snapshots Kalshi + Polymarket + top-wallet fills, settles resolved markets |
+| `lab-pairs` | hourly :07 | matches the same event across venues |
+| `lab-decide` | hourly :20 | logs the combined-strategy decision per forecasted market |
+| `lab-forecast` | every 3h :30 | blind Claude forecasts, hard-capped by `FORECAST_BUDGET_USD` per run |
+| `lab-daily` | 06:50 UTC | refits weights, scores everything, writes `reports/daily-YYYY-MM-DD.json` |
+
+Scheduled jobs show as `stopped` between runs; that is normal (pm2 restarts them on their cron).
+Worst-case AI spend = 8 runs/day x `FORECAST_BUDGET_USD` (default $2 -> $16/day). Lower it in `.env`.
+Nothing here listens on a port, so no firewall changes are needed; no orders are ever placed.
+
+Check on it: `pm2 status`, `pm2 logs lab-record`, `cat reports/daily-*.json`
+(look at `combined.ready_for_real_money`; it stays `false` until the evidence gate passes).

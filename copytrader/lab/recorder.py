@@ -70,7 +70,12 @@ def record_polymarket(c, session, pages=3):
 def record_wallets(c, poly, top_n=20, period="WEEK"):
     n = 0
     for t in poly.top_traders(top_n, period):
-        for tr in poly.recent_trades(t["wallet"], 100):
+        time.sleep(0.4)                                # pace requests across wallets
+        try:
+            trades = poly.recent_trades(t["wallet"], 100)
+        except Exception as e:
+            print("wallet fetch failed:", t["wallet"][:10], repr(e)[:80]); continue
+        for tr in trades:
             cur = c.execute("INSERT OR IGNORE INTO wallet_trades VALUES(?,?,?,?,?,?,?,?,?,?)",
                             (tr["id"], tr["ts"], tr["wallet"], tr["side"], tr["outcome"], tr["price"],
                              tr["usdc"], tr["title"], tr["slug"], tr["condition_id"]))

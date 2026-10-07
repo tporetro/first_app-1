@@ -3,6 +3,7 @@
 Polymarket's websocket streams market data, not per-wallet fills, so wallet
 tracking is done by polling /activity, which is public and keyless.
 """
+import time
 import requests
 from .config import POLYMARKET_DATA_API
 
@@ -13,9 +14,13 @@ class PolymarketClient:
         self.s = session or requests.Session()
 
     def _get(self, path, **params):
-        r = self.s.get(f"{self.base}{path}", params=params, timeout=15)
+        for attempt in range(6):
+            r = self.s.get(f"{self.base}{path}", params=params, timeout=15)
+            if r.status_code == 429:               # rate limited: back off and retry
+                time.sleep(2 * (attempt + 1)); continue
+            r.raise_for_status()
+            return r.json()
         r.raise_for_status()
-        return r.json()
 
     def top_traders(self, n=20, period="WEEK", order_by="PNL"):
         rows = self._get("/v1/leaderboard", timePeriod=period, orderBy=order_by, limit=n)

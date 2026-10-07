@@ -5,3 +5,6 @@ state/
 __pycache__/
 .pytest_cache/
 lab.db
+.venv/
+reports/
+*.db
