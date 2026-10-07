@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS features(
   ts REAL, day TEXT, venue TEXT, market_id TEXT, mid REAL, bid REAL, ask REAL,
   p_ai REAL, x_ai REAL, x_xv REAL, x_flow REAL, p_comb REAL, side TEXT, edge REAL, kelly REAL,
   PRIMARY KEY(venue, market_id, day));
+CREATE TABLE IF NOT EXISTS orders(
+  ts REAL, day TEXT, venue TEXT, market_id TEXT, side TEXT, count INTEGER, price REAL, usd REAL,
+  live INTEGER, p_comb REAL, response TEXT, PRIMARY KEY(venue, market_id, day));
 CREATE TABLE IF NOT EXISTS weights(ts REAL, w_ai REAL, w_xv REAL, w_flow REAL, n INTEGER);
 """
 

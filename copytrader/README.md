@@ -103,3 +103,26 @@ Nothing here listens on a port, so no firewall changes are needed; no orders are
 
 Check on it: `pm2 status`, `pm2 logs lab-record`, `cat reports/daily-*.json`
 (look at `combined.ready_for_real_money`; it stays `false` until the evidence gate passes).
+
+---
+
+# Order-routing bridge (`lab/bridge.py`), locked
+
+`python lab_cli.py route` turns the day's combined-strategy decisions into Kalshi limit orders.
+By default (and under pm2's `lab-route`) it is a **dry run**: it logs what it *would* do to
+`ledger/bridge.jsonl` (hash-chained) and sends nothing.
+
+An order is sent only if **all** of these hold:
+
+1. **Evidence gate**: `evaluate` says `ready_for_real_money` (>=200 resolved markets, >=100 simulated trades, beats the market's Brier score, 5th-percentile bootstrap PnL > 0). There is no flag to skip this on production.
+2. `--live` is passed **and** `KALSHI_LIVE_CONFIRM=YES_SEND_REAL_ORDERS`.
+3. Kalshi API credentials (`KALSHI_KEY_ID`, `KALSHI_PRIVATE_KEY_PATH`) are present.
+4. On the production host, also `KALSHI_PROD_CONFIRM=I_ACCEPT_REAL_MONEY_RISK`. `KALSHI_BASE_URL` defaults to the **demo** host.
+5. No `KILL` file exists (`touch KILL` stops everything instantly) and the drawdown breaker is not tripped (7-day realized loss > 5% of bankroll).
+6. Per order: decision < 6h old, market still open, **fresh price re-checked** (edge must still exceed 4c after fees), size = min(1/4-Kelly capped at 2% of bankroll, $25/trade, $40/market, $100/day), one order per market per day.
+
+Test the plumbing with fake money first: set `KALSHI_BASE_URL` to the demo host, add demo credentials, then
+`python lab_cli.py route --live --demo-skip-gate` (the gate bypass works **only** on the demo host).
+
+Going live on real money is intentionally manual: it takes a code-level decision to add `--live` to the pm2 job
+plus the three confirm variables above. Start with a tiny bankroll, and keep `touch KILL` in mind.

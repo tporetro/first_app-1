@@ -19,6 +19,10 @@ module.exports = {
     job("lab-pairs",  "pairs",  "7 * * * *"),
     job("lab-decide", "decide", "20 * * * *"),
 
+    // order bridge, DRY-RUN ONLY as configured: logs "route_planned_blocked" to ledger/bridge.jsonl until the
+    // evidence gate opens. It has no --live arg; going live is a deliberate manual edit (see README).
+    job("lab-route", "route", "40 * * * *"),
+
     // AI forecasts every 3h; spend is hard-capped per run by FORECAST_BUDGET_USD (default $2)
     // worst case = 8 runs/day x budget. Edit FORECAST_BUDGET_USD / FORECAST_LIMIT in .env.
     job("lab-forecast", "forecast", "30 */3 * * *"),
