@@ -50,3 +50,32 @@ How to read it honestly:
 - `--budget` hard-caps API spend per run; default model `claude-opus-5-5` (override with
   `FORECAST_MODEL`, e.g. a cheaper model for wide sweeps). Cost per forecast is stored per row.
 - Nothing here places orders.
+
+---
+
+# The combined strategy (`lab/strategy.py`)
+
+    logit(p) = logit(market mid) + w_ai*x_ai + w_xv*x_xv + w_flow*x_flow
+
+| signal | meaning |
+|---|---|
+| `x_ai` | blind Claude forecast vs market price (log-odds gap) |
+| `x_xv` | the same event's price on the *other* venue vs this one (needs `pairs`) |
+| `x_flow` | net size-weighted buying by tracked top wallets toward this outcome (6h window) |
+
+With no signals, p equals the market price. Weights start as small priors
+(0.35 / 0.30 / 0.15) and are refit by ridge logistic regression on **resolved** history,
+so a signal only gains influence after it has been right. Trades need edge > 4c *after*
+Kalshi's fee and slippage, are sized with 1/4 Kelly, and are capped at 2% of bankroll.
+
+    python lab_cli.py loop            # record continuously
+    python lab_cli.py pairs           # match the same event across venues
+    python lab_cli.py forecast        # blind AI forecasts
+    python lab_cli.py decide          # log combined decision per market (point-in-time, no look-ahead)
+    python lab_cli.py fit             # refit weights from resolved markets (needs >= 30)
+    python lab_cli.py evaluate        # Brier vs market + bootstrap PnL + the real-money gate
+
+**Real-money gate** (`ready_for_real_money`): >= 200 resolved markets, >= 100 simulated
+trades, combined Brier beats the market's, and the 5th-percentile bootstrap PnL is > 0.
+Until it says true, everything is paper. The tests check that a noise-only signal
+does NOT pass the gate and an informative one does.

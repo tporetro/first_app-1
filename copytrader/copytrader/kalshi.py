@@ -38,11 +38,11 @@ class KalshiClient:
                 "Content-Type": "application/json"}
 
     def _req(self, method, path, auth=False, **kw):
-        for attempt in range(5):
+        for attempt in range(6):
             r = self.s.request(method, self.base + path, headers=self._headers(method, path) if auth else {},
                                timeout=15, **kw)
             if r.status_code == 429:               # rate limited: back off and retry
-                time.sleep(1.5 * (attempt + 1)); continue
+                time.sleep(3 * (attempt + 1)); continue
             r.raise_for_status()
             return r.json()
         r.raise_for_status()
@@ -58,6 +58,7 @@ class KalshiClient:
             cursor = d.get("cursor")
             if not cursor:
                 break
+            time.sleep(0.6)                      # stay under Kalshi's read rate limit
         return out
 
     def series_markets(self, series):

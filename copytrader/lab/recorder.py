@@ -59,7 +59,7 @@ def record_polymarket(c, session, pages=3):
             if len(outs) != 2:
                 continue
             db.upsert_market(c, "polymarket", m["conditionId"], m["question"], outs[0],
-                             m.get("description", ""), m.get("endDate"))
+                             m.get("description", ""), m.get("endDate"), None, m.get("slug"))
             db.add_snapshot(c, "polymarket", m["conditionId"], _f(m.get("bestBid")), _f(m.get("bestAsk")),
                             _f(prices[0]), _f(m.get("volume")))
             n += 1
