@@ -1,0 +1,77 @@
+#!/usr/bin/env ruby
+# Polls Quiver for insider open-market purchases and sends clusters to Telegram.
+#
+#   QUIVER_API_KEY=... TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=... bin/insider_alerts
+#   bin/insider_alerts --dry-run     # print instead of sending
+#
+# NOTE: the Quiver endpoint and field names below follow Quiver's public API docs
+# but were not verified against a live key; adjust FIELDS if responses differ.
+require "net/http"
+require "json"
+require "date"
+require "set"
+
+DRY_RUN     = ARGV.include?("--dry-run")
+MIN_BUYERS  = Integer(ENV.fetch("MIN_BUYERS", 3))
+WINDOW_DAYS = Integer(ENV.fetch("WINDOW_DAYS", 60))
+INTERVAL    = Integer(ENV.fetch("POLL_SECONDS", 900))
+STATE_FILE  = File.expand_path("../tmp/insider_alerts_seen.json", __dir__)
+ENDPOINT    = "https://api.quiverquant.com/beta/live/insiders"
+FIELDS      = { ticker: "Ticker", name: "Name", title: "Title", date: "Date",
+                code: "TransactionCode", shares: "Shares", price: "PricePerShare" }.freeze
+
+def get_json(url, headers)
+  uri = URI(url)
+  Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
+    res = http.get(uri.request_uri, headers)
+    raise "HTTP #{res.code}: #{res.body[0, 200]}" unless res.is_a?(Net::HTTPSuccess)
+    JSON.parse(res.body)
+  end
+end
+
+def send_telegram(text)
+  return puts(text) if DRY_RUN
+  uri = URI("https://api.telegram.org/bot#{ENV.fetch('TELEGRAM_BOT_TOKEN')}/sendMessage")
+  Net::HTTP.post_form(uri, chat_id: ENV.fetch("TELEGRAM_CHAT_ID"), text: text)
+end
+
+def clusters(rows)
+  cutoff = Date.today - WINDOW_DAYS
+  buys = rows.select do |r|
+    r[FIELDS[:code]] == "P" && (Date.parse(r[FIELDS[:date]].to_s) rescue Date.new(0)) >= cutoff
+  end
+  buys.group_by { |r| r[FIELDS[:ticker]] }.filter_map do |ticker, rs|
+    names = rs.map { |r| r[FIELDS[:name]] }.uniq
+    next if names.size < MIN_BUYERS
+    total = rs.sum { |r| r[FIELDS[:shares]].to_f * r[FIELDS[:price]].to_f }
+    batch = rs.map { |r| r[FIELDS[:date]] }.uniq.size == 1
+    { ticker: ticker, buyers: names.size, total: total, batch: batch,
+      people: rs.map { |r| "#{r[FIELDS[:name]]} (#{r[FIELDS[:title]]})" }.uniq }
+  end.sort_by { |c| [-c[:buyers], -c[:total]] }
+end
+
+def run_once
+  seen = File.exist?(STATE_FILE) ? Set.new(JSON.parse(File.read(STATE_FILE))) : Set.new
+  rows = get_json(ENDPOINT, "Authorization" => "Bearer #{ENV.fetch('QUIVER_API_KEY')}",
+                            "Accept" => "application/json")
+  clusters(rows).each do |c|
+    key = "#{c[:ticker]}:#{c[:buyers]}"
+    next if seen.include?(key)
+    seen << key
+    flag = c[:batch] ? "\n⚠️ All filed the same day, may be a compensation plan" : ""
+    send_telegram("Insider cluster: #{c[:ticker]}\n#{c[:buyers]} buyers, ~$#{c[:total].round}\n" \
+                  "#{c[:people].join("\n")}#{flag}")
+  end
+  Dir.mkdir(File.dirname(STATE_FILE)) unless Dir.exist?(File.dirname(STATE_FILE))
+  File.write(STATE_FILE, JSON.generate(seen.to_a))
+end
+
+loop do
+  begin
+    run_once
+  rescue => e
+    warn "[#{Time.now}] #{e.message}"
+  end
+  break if DRY_RUN
+  sleep INTERVAL
+end
